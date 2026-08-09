@@ -268,60 +268,6 @@ async function pageTranscriptExtractor() {
   }
 
   /**
-   * Provoca que el reproductor pida los subtítulos y captura esa URL, que sí
-   * lleva el token `pot` (Proof of Origin) que YouTube exige desde 2025.
-   * Sin él, /api/timedtext responde 200 con 0 bytes aunque haya transcripción.
-   *
-   * Se activa y se restaura la pista de subtítulos previa del usuario; el
-   * cambio es momentáneo. Hay que recorrer varias pistas porque el reproductor
-   * no vuelve a pedir por red una que ya tenga cacheada.
-   */
-  async function capturePlayerCaptionUrl(player, tracklist) {
-    const captured = [];
-    const record = (url) => {
-      const str = String(url || '');
-      if (str.includes('/api/timedtext') && str.includes('pot=')) captured.push(str);
-    };
-
-    const origFetch = window.fetch;
-    const origOpen = XMLHttpRequest.prototype.open;
-
-    window.fetch = function (input) {
-      try {
-        record(typeof input === 'string' ? input : (input && input.url) || '');
-      } catch (e) { /* noop */ }
-      return origFetch.apply(this, arguments);
-    };
-    XMLHttpRequest.prototype.open = function (method, url) {
-      try { record(url); } catch (e) { /* noop */ }
-      return origOpen.apply(this, arguments);
-    };
-
-    let previous = null;
-    try { previous = player.getOption('captions', 'track'); } catch (e) { /* noop */ }
-
-    try {
-      for (const candidate of tracklist) {
-        try {
-          player.setOption('captions', 'track', candidate);
-        } catch (e) {
-          continue;
-        }
-        for (let i = 0; i < 15 && !captured.length; i++) await sleep(150);
-        if (captured.length) break;
-      }
-    } finally {
-      window.fetch = origFetch;
-      XMLHttpRequest.prototype.open = origOpen;
-      try {
-        player.setOption('captions', 'track', previous && previous.languageCode ? previous : {});
-      } catch (e) { /* noop */ }
-    }
-
-    return captured[0] || null;
-  }
-
-  /**
    * URLs de subtítulos con `pot` que el reproductor ya pidió en esta página.
    * Es gratis y no altera nada de la UI, así que se mira antes de forzar nada.
    */
@@ -365,41 +311,152 @@ async function pageTranscriptExtractor() {
     }
     log.push('player: URLs de performance agotadas');
 
-    // 2b. Forzar al reproductor a pedirlas para capturar una URL fresca.
+    // 2b. Forzar al reproductor a pedirlas para capturar una URL fresca con pot.
     const player = document.querySelector('#movie_player');
     if (!player || typeof player.getOption !== 'function') {
       log.push('player: #movie_player no disponible');
       return null;
     }
 
-    try { player.loadModule('captions'); } catch (e) { /* noop */ }
-    await sleep(300);
+    // e) Guardar el estado inicial de subtítulos del usuario
+    let wasSubtitlesOn = false;
+    try {
+      wasSubtitlesOn = typeof player.isSubtitlesOn === 'function' ? player.isSubtitlesOn() : false;
+    } catch (e) { /* noop */ }
+    let previousTrack = null;
+    try {
+      previousTrack = player.getOption('captions', 'track');
+    } catch (e) { /* noop */ }
 
-    let tracklist = [];
-    try { tracklist = player.getOption('captions', 'tracklist') || []; } catch (e) { /* noop */ }
-    if (!tracklist.length) {
-      log.push('player: tracklist vacía');
+    // a) Construir lista de candidatas a partir de orderedTracks sin depender de getOption('captions','tracklist')
+    const candidates = orderedTracks.map((t) => ({
+      languageCode: t.languageCode,
+      kind: t.kind,
+      vss_id: t.vssId || t.vss_id
+    }));
+
+    try {
+      const playerTracklist = player.getOption('captions', 'tracklist') || [];
+      for (const pt of playerTracklist) {
+        if (
+          pt &&
+          pt.languageCode &&
+          !candidates.some((c) => c.languageCode === pt.languageCode && c.kind === pt.kind)
+        ) {
+          candidates.push(pt);
+        }
+      }
+    } catch (e) { /* noop */ }
+
+    if (!candidates.length) {
+      log.push('player: sin pistas candidatas');
       return null;
     }
 
-    // Se intenta primero la pista preferida; si está cacheada no genera
-    // petición de red, así que se recorren las demás hasta capturar una URL.
-    const preferredCode = orderedTracks[0] && orderedTracks[0].languageCode;
-    const candidates = tracklist
-      .slice()
-      .sort((a, b) => (b.languageCode === preferredCode) - (a.languageCode === preferredCode));
+    // Hooks de fetch/XHR como red de seguridad
+    const capturedFromHooks = [];
+    const recordHook = (url) => {
+      const str = String(url || '');
+      if (str.includes('/api/timedtext') && str.includes('pot=')) capturedFromHooks.push(str);
+    };
 
-    const capturedUrl = await capturePlayerCaptionUrl(player, candidates);
-    if (!capturedUrl) {
-      log.push('player: no se capturó ninguna URL con pot');
+    const origFetch = window.fetch;
+    const origOpen = XMLHttpRequest.prototype.open;
+
+    window.fetch = function (input) {
+      try {
+        recordHook(typeof input === 'string' ? input : (input && input.url) || '');
+      } catch (e) { /* noop */ }
+      return origFetch.apply(this, arguments);
+    };
+    XMLHttpRequest.prototype.open = function (method, url) {
+      try { recordHook(url); } catch (e) { /* noop */ }
+      return origOpen.apply(this, arguments);
+    };
+
+    // c) Helper para sondear performance (y hooks como fallback) buscando la URL más reciente
+    const pollForUrl = async (maxMs = 2500, intervalMs = 250, initialLatest = null) => {
+      const deadline = Date.now() + maxMs;
+      while (Date.now() < deadline) {
+        const perfUrls = timedTextUrlsFromPerformance();
+        const latestPerf = perfUrls[0] || null;
+        if (latestPerf && latestPerf !== initialLatest) {
+          return latestPerf;
+        }
+        if (capturedFromHooks.length) {
+          const latestHook = capturedFromHooks[capturedFromHooks.length - 1];
+          if (latestHook && latestHook !== initialLatest) {
+            return latestHook;
+          }
+        }
+        await sleep(intervalMs);
+      }
+      return (
+        timedTextUrlsFromPerformance()[0] ||
+        (capturedFromHooks.length ? capturedFromHooks[capturedFromHooks.length - 1] : null) ||
+        null
+      );
+    };
+
+    try {
+      // b) Nuevo disparador: recargar el módulo de subtítulos con la primera candidata
+      const initialLatest = timedTextUrlsFromPerformance()[0] || null;
+      try {
+        if (typeof player.unloadModule === 'function') player.unloadModule('captions');
+      } catch (e) { /* noop */ }
+      await sleep(400);
+      try {
+        if (typeof player.loadModule === 'function') player.loadModule('captions');
+      } catch (e) { /* noop */ }
+      await sleep(800);
+      try {
+        player.setOption('captions', 'track', candidates[0]);
+      } catch (e) { /* noop */ }
+
+      let capturedUrl = await pollForUrl(2500, 250, initialLatest);
+      if (capturedUrl) {
+        const hit = await tryCapturedUrl(capturedUrl, orderedTracks);
+        if (hit) return hit;
+      }
+
+      // d) Recorrer el resto de candidatas sólo si hace falta
+      for (let i = 1; i < candidates.length; i++) {
+        const cand = candidates[i];
+        const beforeCandLatest = timedTextUrlsFromPerformance()[0] || null;
+        try {
+          player.setOption('captions', 'track', cand);
+        } catch (e) {
+          continue;
+        }
+        capturedUrl = await pollForUrl(2500, 250, beforeCandLatest);
+        if (capturedUrl) {
+          const hit = await tryCapturedUrl(capturedUrl, orderedTracks);
+          if (hit) return hit;
+        }
+      }
+
+      log.push('player: URL con pot no encontrada o pistas vacías tras todos los intentos');
       return null;
+    } finally {
+      // Restaurar hooks
+      window.fetch = origFetch;
+      XMLHttpRequest.prototype.open = origOpen;
+
+      // e) Restaurar estado de subtítulos del usuario
+      try {
+        if (!wasSubtitlesOn) {
+          if (typeof player.isSubtitlesOn === 'function' && player.isSubtitlesOn()) {
+            player.toggleSubtitles();
+          } else if (typeof player.unloadModule === 'function') {
+            player.unloadModule('captions');
+          } else {
+            player.setOption('captions', 'track', {});
+          }
+        } else if (previousTrack && previousTrack.languageCode) {
+          player.setOption('captions', 'track', previousTrack);
+        }
+      } catch (e) { /* noop */ }
     }
-
-    const hit = await tryCapturedUrl(capturedUrl, orderedTracks);
-    if (hit) return hit;
-
-    log.push('player: URL capturada pero todas las pistas vinieron vacías');
-    return null;
   }
 
   /** Endpoint interno que usa el propio panel de transcripción de YouTube. */
@@ -458,6 +515,8 @@ async function pageTranscriptExtractor() {
 
   /** Último recurso: abrir el panel "Mostrar transcripción" y leer el DOM. */
   async function fromTranscriptPanel() {
+    const isVisible = (el) => Boolean(el && el.offsetParent !== null && el.offsetHeight > 0);
+
     const readSegments = () => {
       const els = Array.from(
         document.querySelectorAll(
@@ -479,25 +538,40 @@ async function pageTranscriptExtractor() {
     const expand = document.querySelector(
       '#description-inline-expander #expand, tp-yt-paper-button#expand, ytd-text-inline-expander #expand, #expand-sizer'
     );
-    if (expand && expand.offsetHeight > 0) {
+    if (expand && isVisible(expand)) {
       expand.click();
       await sleep(400);
     }
 
     // Buscar el botón de transcripción (compatible con layout clásico y moderno)
-    let button = document.querySelector(
-      'ytd-video-description-transcript-section-renderer button, ytd-structured-description-content-renderer button, button[aria-label*="transcrip" i], button[aria-label*="transcript" i]'
+    const directSectionBtn = document.querySelector(
+      'ytd-video-description-transcript-section-renderer button'
     );
+    let button = directSectionBtn && isVisible(directSectionBtn) ? directSectionBtn : null;
+
     if (!button) {
       const candidates = Array.from(
-        document.querySelectorAll('button, tp-yt-paper-button, yt-button-shape, ytd-button-renderer')
+        document.querySelectorAll(
+          'ytd-video-description-transcript-section-renderer button, ytd-video-description-transcript-section-renderer, ytd-structured-description-content-renderer button, button, tp-yt-paper-button, yt-button-shape, ytd-button-renderer'
+        )
       );
-      button = candidates.find((b) => {
+      const matching = candidates.filter((b) => {
+        if (!isVisible(b)) return false;
         const label = ((b.textContent || '') + ' ' + (b.getAttribute('aria-label') || '')).toLowerCase();
         return label.includes('transcripci') || label.includes('transcript');
       });
+
+      // Priorizar el que esté dentro de ytd-video-description-transcript-section-renderer
+      button =
+        matching.find((b) => b.closest('ytd-video-description-transcript-section-renderer')) ||
+        matching[0] ||
+        null;
+
       if (button && button.tagName !== 'BUTTON') {
-        button = button.querySelector('button') || button;
+        const innerBtn = button.querySelector('button');
+        if (innerBtn && isVisible(innerBtn)) {
+          button = innerBtn;
+        }
       }
     }
 
