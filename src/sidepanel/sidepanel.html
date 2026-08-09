@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YouTube Gemini Summarizer</title>
+  <link rel="stylesheet" href="sidepanel.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- HEADER -->
+    <header class="app-header">
+      <div class="brand">
+        <div class="logo-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M21.582 6.186a2.696 2.696 0 0 0-1.897-1.897C17.99 3.8 12 3.8 12 3.8s-5.99 0-7.685.489C2.62 4.689 1.93 5.38 1.44 6.186 1 7.88 1 12 1 12s0 4.12.44 5.814c.49.806 1.18 1.497 1.875 1.897C4.99 20.2 12 20.2 12 20.2s5.99 0 7.685-.489c.695-.4 1.385-1.091 1.897-1.897C23 16.12 23 12 23 12s0-4.12-.418-5.814zM9.8 15.5V8.5l6.2 3.5-6.2 3.5z" fill="url(#yt-gradient)"/>
+            <defs>
+              <linearGradient id="yt-gradient" x1="1" y1="3.8" x2="23" y2="20.2" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#FF0000"/>
+                <stop offset="1" stop-color="#A855F7"/>
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <h1>YT Gemini</h1>
+          <span class="version-tag">v1.0</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- CONTROL PANEL -->
+    <section class="control-card">
+      <button id="summarizeShortBtn" class="secondary-action-btn">
+        <span class="btn-icon">⚡</span>
+        <span class="btn-text">Resumen corto</span>
+      </button>
+
+      <button id="summarizeExtendedBtn" class="primary-btn">
+        <span class="btn-icon">📋</span>
+        <span class="btn-text">Resumen extendido</span>
+      </button>
+
+      <div class="gem-btn-wrapper">
+        <button id="criticalAnalysisBtn" class="secondary-action-btn">
+          <span class="btn-icon">🔬</span>
+          <span class="btn-text">Análisis crítico</span>
+        </button>
+        <span class="gem-subtext">Gem: investigador independiente CIENCIA</span>
+      </div>
+    </section>
+
+    <!-- MAIN CONTENT VIEW AREA -->
+    <main class="content-area">
+      <!-- 1. IDLE STATE -->
+      <div id="idleState" class="state-view active">
+        <div class="placeholder-box">
+          <div class="placeholder-icon">📹</div>
+          <h3>Listo para resumir</h3>
+          <p>Navega a un vídeo de YouTube y elige la modalidad de resumen o análisis que prefieras.</p>
+        </div>
+      </div>
+
+      <!-- 2. LOADING STATE -->
+      <div id="loadingState" class="state-view">
+        <div class="loading-box">
+          <div class="spinner"></div>
+          <h3 id="loadingTitle">Procesando Video</h3>
+          
+          <div class="progress-steps">
+            <div id="stepTranscript" class="step-item active">
+              <span class="step-icon">📄</span>
+              <span class="step-label">Extrayendo transcripción de YouTube...</span>
+            </div>
+            <div id="stepGemini" class="step-item">
+              <span class="step-icon">🚀</span>
+              <span class="step-label">Abriendo Gemini y pegando...</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. SUCCESS STATE -->
+      <div id="successState" class="state-view">
+        <div class="summary-header">
+          <div class="video-info">
+            <span class="badge">YouTube</span>
+            <h2 id="videoTitleDisplay" class="video-title">Título del Video</h2>
+            <div class="meta-info">
+              <span id="metaLang">Idioma: ES</span> • <span id="metaWords">~1200 palabras</span>
+            </div>
+          </div>
+
+          <div class="toolbar">
+            <button id="copyTranscriptBtn" class="tool-btn" title="Copiar transcripción al portapapeles">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+              <span>Copiar transcripción</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="notice-card">
+          <div id="noticeTitle" class="notice-title">✨ Enviado a Gemini Web</div>
+          <p class="notice-text">
+            Se ha abierto una nueva pestaña a la derecha en Gemini con el contenido correspondiente.
+          </p>
+          <div class="notice-subtext">
+            Si el pegado automático fallara en la página, el contenido ya está copiado en tu portapapeles: sólo pulsa <strong>Cmd + V</strong> (o <strong>Ctrl + V</strong>) en el chat.
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. ERROR STATE -->
+      <div id="errorState" class="state-view">
+        <div class="error-box">
+          <div class="error-icon">⚠️</div>
+          <h3>Ocurrió un Problema</h3>
+          <p id="errorMessageText">No se pudo procesar la solicitud.</p>
+          
+          <div class="error-actions">
+            <button id="retryBtn" class="secondary-btn">Reintentar</button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="app-footer">
+      <span>Local-First • Manifest V3</span>
+    </footer>
+  </div>
+
+  <script type="module" src="sidepanel.js"></script>
+</body>
+</html>
