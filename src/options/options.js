@@ -109,8 +109,22 @@ function closeEditor() {
   editForm.classList.add('hidden');
 }
 
-// Toggle Gem URL field
-actionDestSelect.addEventListener('change', toggleGemUrlVisibility);
+// Toggle Gem URL field and handle prompt template
+actionDestSelect.addEventListener('change', () => {
+  toggleGemUrlVisibility();
+  if (actionDestSelect.value === 'gem') {
+    const currentPrompt = actionPromptInput.value.trim();
+    if (currentPrompt === '' || currentPrompt === '{{transcripcion}}') {
+      actionPromptInput.value = `Analiza la transcripción del vídeo de YouTube que va debajo aplicando tu método habitual. No te presentes ni me preguntes qué analizar: el material es este texto.
+
+Título: {{titulo}}
+URL: {{url}}
+
+TRANSCRIPCIÓN:
+{{transcripcion}}`;
+    }
+  }
+});
 function toggleGemUrlVisibility() {
   if (actionDestSelect.value === 'gem') {
     gemUrlGroup.classList.remove('hidden');
