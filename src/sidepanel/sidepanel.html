@@ -27,26 +27,15 @@
           <span class="version-tag">v1.0</span>
         </div>
       </div>
+      <div class="header-actions">
+        <button id="openOptionsBtn" class="icon-btn" title="Configurar Acciones" style="background:none; border:none; cursor:pointer; font-size:18px;">⚙️</button>
+      </div>
     </header>
 
     <!-- CONTROL PANEL -->
     <section class="control-card">
-      <button id="summarizeShortBtn" class="secondary-action-btn">
-        <span class="btn-icon">⚡</span>
-        <span class="btn-text">Resumen corto</span>
-      </button>
-
-      <button id="summarizeExtendedBtn" class="primary-btn">
-        <span class="btn-icon">📋</span>
-        <span class="btn-text">Resumen extendido</span>
-      </button>
-
-      <div class="gem-btn-wrapper">
-        <button id="criticalAnalysisBtn" class="secondary-action-btn">
-          <span class="btn-icon">🔬</span>
-          <span class="btn-text">Análisis crítico</span>
-        </button>
-        <span class="gem-subtext">Gem: investigador independiente CIENCIA</span>
+      <div id="actionsContainer" style="display:flex; flex-direction:column; gap:10px; width:100%;">
+        <div style="text-align:center; padding: 10px; color: var(--text-muted); font-size: 12px;">Cargando acciones...</div>
       </div>
     </section>
 

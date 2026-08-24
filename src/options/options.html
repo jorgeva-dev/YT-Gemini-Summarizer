@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Configuración - YouTube Gemini Summarizer</title>
+  <title>Acciones - YouTube Gemini</title>
   <style>
     :root {
       --bg-main: #0B0F19;
@@ -26,67 +26,129 @@
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       font-size: 14px;
       line-height: 1.6;
-      padding: 40px 20px;
+      height: 100vh;
       display: flex;
-      justify-content: center;
     }
 
-    .options-container {
+    .layout {
+      display: flex;
       width: 100%;
-      max-width: 580px;
+      max-width: 1200px;
+      margin: 0 auto;
+      height: 100%;
+    }
+
+    .sidebar {
+      width: 350px;
+      background: rgba(15, 23, 42, 0.6);
+      border-right: 1px solid var(--border-color);
       display: flex;
       flex-direction: column;
+      padding: 24px;
       gap: 20px;
     }
 
-    .header-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border-color);
-      border-radius: var(--radius-lg);
-      padding: 24px;
-      display: flex;
-      align-items: center;
-      gap: 16px;
-    }
-
-    .logo-box {
-      width: 48px;
-      height: 48px;
-      background: rgba(255, 255, 255, 0.05);
-      border-radius: 12px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border: 1px solid var(--border-color);
-    }
-
-    .header-info h1 {
-      font-size: 20px;
-      font-weight: 700;
+    .sidebar h2 {
+      font-size: 18px;
       background: var(--gradient-brand);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
     }
 
-    .header-info p {
-      color: var(--text-secondary);
-      font-size: 13px;
-    }
-
-    .settings-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border-color);
-      border-radius: var(--radius-lg);
-      padding: 24px;
+    .actions-list {
+      flex: 1;
+      overflow-y: auto;
       display: flex;
       flex-direction: column;
-      gap: 18px;
+      gap: 10px;
+    }
+
+    .action-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 10px 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .action-item:hover, .action-item.active {
+      border-color: #A855F7;
+      background: rgba(168, 85, 247, 0.1);
+    }
+
+    .action-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 500;
+    }
+    
+    .action-icon {
+      font-size: 18px;
+    }
+
+    .action-controls {
+      display: flex;
+      gap: 4px;
+    }
+
+    .action-controls button {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 14px;
+      padding: 4px;
+      border-radius: 4px;
+    }
+    .action-controls button:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--text-primary);
+    }
+
+    .tools-box {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border-color);
+    }
+
+    .editor-area {
+      flex: 1;
+      padding: 32px 40px;
+      overflow-y: auto;
+    }
+
+    .empty-state {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: var(--text-muted);
+      font-size: 16px;
+    }
+
+    .edit-form {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      max-width: 700px;
+    }
+
+    .form-row {
+      display: flex;
+      gap: 16px;
     }
 
     .form-group {
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 8px;
     }
 
     label {
@@ -95,56 +157,46 @@
       color: var(--text-primary);
     }
 
-    .input-wrapper {
-      position: relative;
-      display: flex;
-      align-items: center;
-    }
-
-    input[type="password"], input[type="text"] {
+    input[type="text"], input[type="url"], select, textarea {
       width: 100%;
       background: rgba(15, 23, 42, 0.9);
       border: 1px solid var(--border-color);
       color: var(--text-primary);
-      padding: 10px 40px 10px 12px;
+      padding: 12px;
       border-radius: var(--radius-md);
-      font-size: 13px;
+      font-size: 14px;
       outline: none;
       transition: border-color 0.2s;
+      font-family: inherit;
     }
 
-    input:focus {
+    input:focus, select:focus, textarea:focus {
       border-color: #A855F7;
-    }
-
-    .toggle-visibility {
-      position: absolute;
-      right: 10px;
-      background: none;
-      border: none;
-      color: var(--text-muted);
-      cursor: pointer;
-      font-size: 14px;
     }
 
     .help-text {
       font-size: 12px;
+      color: var(--text-secondary);
+      line-height: 1.4;
+    }
+
+    .placeholders-help {
+      font-size: 12px;
       color: var(--text-muted);
-    }
-
-    .help-text a {
-      color: #A855F7;
-      text-decoration: none;
-    }
-
-    .help-text a:hover {
-      text-decoration: underline;
-    }
-
-    .btn-row {
+      background: rgba(0,0,0,0.2);
+      padding: 10px;
+      border-radius: var(--radius-md);
       display: flex;
-      gap: 12px;
-      margin-top: 10px;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+    
+    .placeholders-help code {
+      background: rgba(255,255,255,0.1);
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: #D8B4FE;
     }
 
     .btn {
@@ -155,6 +207,10 @@
       cursor: pointer;
       border: none;
       transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
     }
 
     .btn-primary {
@@ -162,27 +218,42 @@
       color: #FFF;
       box-shadow: 0 4px 12px rgba(147, 51, 234, 0.25);
     }
-
-    .btn-primary:hover {
-      opacity: 0.9;
-    }
+    .btn-primary:hover { opacity: 0.9; }
 
     .btn-secondary {
       background: rgba(255, 255, 255, 0.08);
       border: 1px solid var(--border-color);
       color: var(--text-primary);
     }
+    .btn-secondary:hover { background: rgba(255, 255, 255, 0.15); }
 
-    .btn-secondary:hover {
-      background: rgba(255, 255, 255, 0.15);
+    .btn-danger {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: #FCA5A5;
+    }
+    .btn-danger:hover {
+      background: rgba(239, 68, 68, 0.2);
     }
 
+    .form-actions {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 10px;
+    }
+
+    .hidden { display: none !important; }
+
     .toast {
-      display: none;
-      padding: 10px 14px;
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      padding: 12px 20px;
       border-radius: var(--radius-md);
-      font-size: 13px;
+      font-size: 14px;
       font-weight: 500;
+      display: none;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
     }
 
     .toast.success {
@@ -202,39 +273,79 @@
 </head>
 <body>
 
-  <div class="options-container">
-    <header class="header-card">
-      <div class="logo-box">
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
-          <path d="M21.582 6.186a2.696 2.696 0 0 0-1.897-1.897C17.99 3.8 12 3.8 12 3.8s-5.99 0-7.685.489C2.62 4.689 1.93 5.38 1.44 6.186 1 7.88 1 12 1 12s0 4.12.44 5.814c.49.806 1.18 1.497 1.875 1.897C4.99 20.2 12 20.2 12 20.2s5.99 0 7.685-.489c.695-.4 1.385-1.091 1.897-1.897C23 16.12 23 12 23 12s0-4.12-.418-5.814zM9.8 15.5V8.5l6.2 3.5-6.2 3.5z" fill="#A855F7"/>
-        </svg>
+  <div class="layout">
+    <aside class="sidebar">
+      <h2>Tus Acciones</h2>
+      
+      <div id="actionsList" class="actions-list">
+        <!-- Generado dinámicamente -->
       </div>
-      <div class="header-info">
-        <h1>Configuración de YouTube Gemini</h1>
-        <p>Configura tu clave de API para activar los resúmenes en tiempo real.</p>
+      
+      <button id="newActionBtn" class="btn btn-primary">+ Nueva Acción</button>
+      
+      <div class="tools-box">
+        <button id="importBtn" class="btn btn-secondary">Importar JSON</button>
+        <button id="exportBtn" class="btn btn-secondary">Exportar JSON</button>
+        <button id="restoreBtn" class="btn btn-danger">Restaurar por defecto</button>
+        <input type="file" id="fileInput" accept=".json" class="hidden">
       </div>
-    </header>
+    </aside>
 
-    <main class="settings-card">
-      <div class="form-group">
-        <label for="apiKeyInput">Google Gemini API Key:</label>
-        <div class="input-wrapper">
-          <input type="password" id="apiKeyInput" placeholder="AIzaSy..." autocomplete="off">
-          <button id="toggleVisibilityBtn" class="toggle-visibility" type="button" title="Mostrar/Ocultar">👁️</button>
+    <main class="editor-area">
+      <div id="emptyState" class="empty-state">
+        <p>Selecciona una acción para editar o crea una nueva.</p>
+      </div>
+
+      <form id="editForm" class="edit-form hidden">
+        <input type="hidden" id="actionId">
+        
+        <div class="form-row">
+          <div class="form-group" style="flex:1;">
+            <label for="actionName">Nombre de la acción</label>
+            <input type="text" id="actionName" required placeholder="Ej: Resumen corto">
+          </div>
+          <div class="form-group" style="width: 80px;">
+            <label for="actionIcon">Icono</label>
+            <input type="text" id="actionIcon" maxlength="2" required placeholder="⚡">
+          </div>
         </div>
-        <p class="help-text">
-          Obtén tu clave de API gratuita en <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio ↗</a>.
-        </p>
-      </div>
 
-      <div class="btn-row">
-        <button id="saveBtn" class="btn btn-primary">Guardar Configuración</button>
-        <button id="testBtn" class="btn btn-secondary">Probar Conexión</button>
-      </div>
+        <div class="form-group">
+          <label for="actionDest">Destino</label>
+          <select id="actionDest" required>
+            <option value="app">Gemini App (Nueva pestaña)</option>
+            <option value="gem">Gem Personalizado (Nueva pestaña)</option>
+            <option value="portapapeles">Solo copiar al portapapeles</option>
+          </select>
+        </div>
+        
+        <div class="form-group hidden" id="gemUrlGroup">
+          <label for="actionGemUrl">URL del Gem</label>
+          <input type="url" id="actionGemUrl" placeholder="https://gemini.google.com/gem/...">
+          <p class="help-text">Abre tu Gem en gemini.google.com y copia la URL de la barra de direcciones. Consejo: si usas un Gem, deja el prompt sólo con <code>{{transcripcion}}</code>: el Gem ya tiene sus propias instrucciones y añadir las tuyas interfiere con ellas.</p>
+        </div>
 
-      <div id="toastMessage" class="toast"></div>
+        <div class="form-group">
+          <label for="actionPrompt">Prompt / Plantilla</label>
+          <textarea id="actionPrompt" rows="12" required></textarea>
+          <div class="placeholders-help">
+            <strong>Placeholders disponibles:</strong>
+            <code>{{titulo}}</code>
+            <code>{{transcripcion}}</code>
+            <code>{{url}}</code>
+            <code>{{transcripcion_con_tiempos}}</code>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+          <button type="button" id="deleteBtn" class="btn btn-danger">Eliminar Acción</button>
+        </div>
+      </form>
     </main>
   </div>
+
+  <div id="toastMessage" class="toast"></div>
 
   <script type="module" src="options.js"></script>
 </body>

@@ -145,41 +145,57 @@
    */
   function parseTimedText(raw) {
     const text = (raw || '').trim();
-    if (!text) return '';
+    if (!text) return { text: '', segments: [] };
 
     if (text.startsWith('{')) {
       try {
         const data = JSON.parse(text);
         let out = '';
+        const segments = [];
         for (const evt of data.events || []) {
+          let evtOut = '';
           for (const seg of evt.segs || []) {
-            if (seg.utf8) out += seg.utf8 + ' ';
+            if (seg.utf8) evtOut += seg.utf8 + ' ';
+          }
+          const cleanEvtOut = clean(evtOut);
+          if (cleanEvtOut) {
+            out += cleanEvtOut + ' ';
+            segments.push({ tMs: evt.tStartMs || 0, text: cleanEvtOut });
           }
         }
-        return clean(out);
+        return { text: clean(out), segments };
       } catch (e) {
         console.warn('[yt-transcript] JSON timedtext parse fail:', e);
-        return '';
+        return { text: '', segments: [] };
       }
     }
 
     if (text.startsWith('<')) {
       const doc = new DOMParser().parseFromString(text, 'text/xml');
       let out = '';
+      const segments = [];
       for (const node of Array.from(doc.getElementsByTagName('text'))) {
         const decoded = decodeHTMLEntities(node.textContent);
-        if (decoded) out += decoded + ' ';
+        if (decoded) {
+          out += decoded + ' ';
+          const tMs = Math.floor(parseFloat(node.getAttribute('start') || '0') * 1000);
+          segments.push({ tMs, text: decoded });
+        }
       }
       if (!clean(out)) {
         for (const node of Array.from(doc.getElementsByTagName('p'))) {
           const decoded = decodeHTMLEntities(node.textContent);
-          if (decoded) out += decoded + ' ';
+          if (decoded) {
+            out += decoded + ' ';
+            const tMs = parseInt(node.getAttribute('t') || '0', 10);
+            segments.push({ tMs, text: decoded });
+          }
         }
       }
-      return clean(out);
+      return { text: clean(out), segments };
     }
 
-    return '';
+    return { text: '', segments: [] };
   }
 
   /**
@@ -207,13 +223,13 @@
         }
         const raw = await res.text();
         const parsed = parseTimedText(raw);
-        if (parsed) return parsed;
+        if (parsed && parsed.text) return parsed;
         console.warn('[yt-transcript] timedtext vacío, bytes =', raw.length);
       } catch (e) {
         console.warn('[yt-transcript] timedtext fetch error:', e);
       }
     }
-    return '';
+    return { text: '', segments: [] };
   }
 
   /**
@@ -229,13 +245,20 @@
       return els
         .map((el) => {
           const textEl = el.querySelector('.segment-text, #segment-text, yt-formatted-string.segment-text') || el;
-          return clean(textEl.textContent);
+          const timeEl = el.querySelector('.segment-timestamp, #segment-timestamp');
+          const tText = timeEl ? clean(timeEl.textContent) : '0:00';
+          const parts = tText.split(':').map(Number);
+          let tMs = 0;
+          if (parts.length === 3) tMs = (parts[0]*3600 + parts[1]*60 + parts[2]) * 1000;
+          else if (parts.length === 2) tMs = (parts[0]*60 + parts[1]) * 1000;
+          
+          return { tMs, text: clean(textEl.textContent) };
         })
-        .filter(Boolean);
+        .filter(s => s.text);
     };
 
     let segments = readSegments();
-    if (segments.length) return clean(segments.join(' '));
+    if (segments.length) return { text: clean(segments.map(s => s.text).join(' ')), segments };
 
     const expand = document.querySelector(
       '#description-inline-expander #expand, tp-yt-paper-button#expand, ytd-text-inline-expander #expand, #expand-sizer'
@@ -260,7 +283,7 @@
         button = button.querySelector('button') || button;
       }
     }
-    if (!button) return '';
+    if (!button) return { text: '', segments: [] };
 
     button.click();
     for (let i = 0; i < 40; i++) {
@@ -269,7 +292,7 @@
       if (segments.length) break;
     }
 
-    return clean(segments.join(' '));
+    return { text: clean(segments.map(s => s.text).join(' ')), segments };
   }
 
   /**
@@ -302,12 +325,14 @@
 
       let fullTranscript = '';
       let language = 'Auto';
+      let segments = [];
 
       for (const track of ordered) {
         if (!track.baseUrl) continue;
-        const text = await fetchTimedText(track.baseUrl);
-        if (text) {
-          fullTranscript = text;
+        const parsed = await fetchTimedText(track.baseUrl);
+        if (parsed && parsed.text) {
+          fullTranscript = parsed.text;
+          segments = parsed.segments;
           language = trackName(track);
           break;
         }
@@ -315,8 +340,12 @@
 
       // Si timedtext viene vacío (sesión/token), leemos el panel del DOM.
       if (!fullTranscript) {
-        fullTranscript = await scrapeTranscriptPanel();
-        if (fullTranscript && ordered[0]) language = trackName(ordered[0]);
+        const parsed = await scrapeTranscriptPanel();
+        if (parsed && parsed.text) {
+          fullTranscript = parsed.text;
+          segments = parsed.segments;
+          if (ordered[0]) language = trackName(ordered[0]);
+        }
       }
 
       if (!fullTranscript) {
@@ -331,12 +360,24 @@
           error: 'El video tiene subtítulos pero YouTube devolvió el contenido vacío. Recarga la página e inténtalo de nuevo.'
         };
       }
+      
+      let transcriptWithTimes = '';
+      if (segments && segments.length > 0) {
+        transcriptWithTimes = segments.map(seg => {
+          const tSec = Math.floor(seg.tMs / 1000);
+          const m = Math.floor(tSec / 60);
+          const s = tSec % 60;
+          return `[${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}] ${seg.text}`;
+        }).join('\n');
+      }
 
       return {
         success: true,
         title: cleanTitle,
         transcript: fullTranscript,
+        transcriptWithTimes: transcriptWithTimes || fullTranscript,
         language,
+        segments,
         wordCount: fullTranscript.split(/\s+/).filter(Boolean).length
       };
 

@@ -76,6 +76,8 @@ async function fetchAndParseTranscriptText(baseUrl) {
   const rawText = await response.text();
   let fullText = '';
 
+  const segments = [];
+
   // Attempt JSON3 parse
   if (rawText.trim().startsWith('{')) {
     try {
@@ -83,8 +85,14 @@ async function fetchAndParseTranscriptText(baseUrl) {
       if (data.events && Array.isArray(data.events)) {
         for (const evt of data.events) {
           if (evt.segs && Array.isArray(evt.segs)) {
+            let evtOut = '';
             for (const seg of evt.segs) {
-              if (seg.utf8) fullText += seg.utf8 + ' ';
+              if (seg.utf8) evtOut += seg.utf8 + ' ';
+            }
+            const cleanEvtOut = evtOut.replace(/\s+/g, ' ').trim();
+            if (cleanEvtOut) {
+              fullText += cleanEvtOut + ' ';
+              segments.push({ tMs: evt.tStartMs || 0, text: cleanEvtOut });
             }
           }
         }
@@ -101,13 +109,18 @@ async function fetchAndParseTranscriptText(baseUrl) {
     const nodes = xmlDoc.getElementsByTagName('text');
     if (nodes && nodes.length > 0) {
       for (let i = 0; i < nodes.length; i++) {
-        const decoded = decodeEntities(nodes[i].textContent);
-        if (decoded) fullText += decoded + ' ';
+        const node = nodes[i];
+        const decoded = decodeEntities(node.textContent);
+        if (decoded) {
+          fullText += decoded + ' ';
+          const tMs = Math.floor(parseFloat(node.getAttribute('start') || '0') * 1000);
+          segments.push({ tMs, text: decoded });
+        }
       }
     }
   }
 
-  return fullText.replace(/\s+/g, ' ').trim();
+  return { text: fullText.replace(/\s+/g, ' ').trim(), segments };
 }
 
 /**
@@ -176,42 +189,58 @@ async function pageTranscriptExtractor() {
 
   function parseTimedText(raw) {
     const text = (raw || '').trim();
-    if (!text) return '';
+    if (!text) return { text: '', segments: [] };
 
     if (text.startsWith('{')) {
       try {
         const data = JSON.parse(text);
         let out = '';
+        const segments = [];
         for (const evt of data.events || []) {
+          let evtOut = '';
           for (const seg of evt.segs || []) {
-            if (seg.utf8) out += seg.utf8 + ' ';
+            if (seg.utf8) evtOut += seg.utf8 + ' ';
+          }
+          const cleanEvtOut = clean(evtOut);
+          if (cleanEvtOut) {
+            out += cleanEvtOut + ' ';
+            segments.push({ tMs: evt.tStartMs || 0, text: cleanEvtOut });
           }
         }
-        return clean(out);
+        return { text: clean(out), segments };
       } catch (e) {
-        return '';
+        return { text: '', segments: [] };
       }
     }
 
     if (text.startsWith('<')) {
       const doc = new DOMParser().parseFromString(text, 'text/xml');
       let out = '';
+      const segments = [];
       // srv1 / plain XML: <text start=".." dur="..">
       for (const node of Array.from(doc.getElementsByTagName('text'))) {
         const d = decode(node.textContent);
-        if (d) out += d + ' ';
+        if (d) {
+          out += d + ' ';
+          const tMs = Math.floor(parseFloat(node.getAttribute('start') || '0') * 1000);
+          segments.push({ tMs, text: d });
+        }
       }
       // srv3: <p><s>..</s></p>
       if (!clean(out)) {
         for (const node of Array.from(doc.getElementsByTagName('p'))) {
           const d = decode(node.textContent);
-          if (d) out += d + ' ';
+          if (d) {
+            out += d + ' ';
+            const tMs = parseInt(node.getAttribute('t') || '0', 10);
+            segments.push({ tMs, text: d });
+          }
         }
       }
-      return clean(out);
+      return { text: clean(out), segments };
     }
 
-    return '';
+    return { text: '', segments: [] };
   }
 
   /** Descarga el baseUrl probando varios formatos hasta obtener contenido. */
@@ -236,13 +265,13 @@ async function pageTranscriptExtractor() {
         }
         const raw = await res.text();
         const parsed = parseTimedText(raw);
-        if (parsed) return parsed;
+        if (parsed && parsed.text) return parsed;
         log.push('timedtext respuesta vacía (bytes=' + raw.length + ')');
       } catch (e) {
         log.push('timedtext fetch: ' + e.message);
       }
     }
-    return '';
+    return { text: '', segments: [] };
   }
 
   /**
@@ -294,7 +323,7 @@ async function pageTranscriptExtractor() {
           continue;
         }
         const parsed = parseTimedText(await res.text());
-        if (parsed) return { text: parsed, track };
+        if (parsed && parsed.text) return { text: parsed.text, segments: parsed.segments, track };
       } catch (e) {
         log.push('player timedtext: ' + e.message);
       }
@@ -495,12 +524,17 @@ async function pageTranscriptExtractor() {
 
     const data = await res.json();
     const parts = [];
+    const segments = [];
     (function walk(node) {
       if (!node || typeof node !== 'object') return;
       const snippet = node.transcriptSegmentRenderer && node.transcriptSegmentRenderer.snippet;
       if (snippet) {
         const t = snippet.simpleText || (snippet.runs || []).map((r) => r.text).join('');
-        if (t) parts.push(t);
+        if (t) {
+          parts.push(t);
+          const startMs = parseInt(node.transcriptSegmentRenderer.startMs || '0', 10);
+          segments.push({ tMs: startMs, text: t });
+        }
         return;
       }
       if (Array.isArray(node)) {
@@ -510,7 +544,7 @@ async function pageTranscriptExtractor() {
       for (const key of Object.keys(node)) walk(node[key]);
     })(data);
 
-    return clean(parts.join(' '));
+    return { text: clean(parts.join(' ')), segments };
   }
 
   /** Último recurso: abrir el panel "Mostrar transcripción" y leer el DOM. */
@@ -526,13 +560,20 @@ async function pageTranscriptExtractor() {
       return els
         .map((el) => {
           const textEl = el.querySelector('.segment-text, #segment-text, yt-formatted-string.segment-text') || el;
-          return clean(textEl.textContent);
+          const timeEl = el.querySelector('.segment-timestamp, #segment-timestamp');
+          const tText = timeEl ? clean(timeEl.textContent) : '0:00';
+          const parts = tText.split(':').map(Number);
+          let tMs = 0;
+          if (parts.length === 3) tMs = (parts[0]*3600 + parts[1]*60 + parts[2]) * 1000;
+          else if (parts.length === 2) tMs = (parts[0]*60 + parts[1]) * 1000;
+          
+          return { tMs, text: clean(textEl.textContent) };
         })
-        .filter(Boolean);
+        .filter(s => s.text);
     };
 
     let segments = readSegments();
-    if (segments.length) return clean(segments.join(' '));
+    if (segments.length) return { text: clean(segments.map(s => s.text).join(' ')), segments };
 
     // Desplegar la descripción
     const expand = document.querySelector(
@@ -588,7 +629,7 @@ async function pageTranscriptExtractor() {
     }
 
     if (!segments.length) log.push('panel: no aparecieron segmentos');
-    return clean(segments.join(' '));
+    return { text: clean(segments.map(s => s.text).join(' ')), segments };
   }
 
   const playerResponse = getPlayerResponse();
@@ -613,14 +654,14 @@ async function pageTranscriptExtractor() {
 
   log.push('pistas detectadas: ' + tracks.map((t) => t.languageCode + (t.kind === 'asr' ? '/asr' : '')).join(', '));
 
-  // Capa 1: timedtext desde el contexto de la página (probando todas las pistas).
   for (const track of ordered) {
     if (!track.baseUrl) continue;
-    const text = await fetchTimedText(track.baseUrl);
-    if (text) {
+    const parsed = await fetchTimedText(track.baseUrl);
+    if (parsed && parsed.text) {
       return {
         ok: true,
-        transcript: text,
+        transcript: parsed.text,
+        segments: parsed.segments,
         title,
         language: trackName(track),
         source: 'timedtext',
@@ -629,14 +670,13 @@ async function pageTranscriptExtractor() {
     }
   }
 
-  // Capa 2: sesión del reproductor (aporta el token `pot`). Es la que funciona
-  // en la mayoría de vídeos actuales, donde el baseUrl "pelado" devuelve 0 bytes.
   try {
     const result = await fromPlayerSession(ordered);
     if (result && result.text) {
       return {
         ok: true,
         transcript: result.text,
+        segments: result.segments,
         title,
         language: trackName(result.track),
         source: 'player-session',
@@ -649,11 +689,12 @@ async function pageTranscriptExtractor() {
 
   // Capa 3: endpoint interno get_transcript.
   try {
-    const text = await fromInnertube();
-    if (text) {
+    const parsed = await fromInnertube();
+    if (parsed && parsed.text) {
       return {
         ok: true,
-        transcript: text,
+        transcript: parsed.text,
+        segments: parsed.segments,
         title,
         language: ordered[0] ? trackName(ordered[0]) : 'Auto',
         source: 'get_transcript',
@@ -666,11 +707,12 @@ async function pageTranscriptExtractor() {
 
   // Capa 4: scraping del panel del DOM.
   try {
-    const text = await fromTranscriptPanel();
-    if (text) {
+    const parsed = await fromTranscriptPanel();
+    if (parsed && parsed.text) {
       return {
         ok: true,
-        transcript: text,
+        transcript: parsed.text,
+        segments: parsed.segments,
         title,
         language: ordered[0] ? trackName(ordered[0]) : 'Auto',
         source: 'panel-dom',
@@ -701,13 +743,26 @@ export async function getTranscriptForTab(tab) {
 
   const fallbackTitle = tab.title ? tab.title.replace(/-\s*YouTube$/i, '').trim() : 'Video de YouTube';
 
-  const buildResult = (title, transcript, language) => ({
-    success: true,
-    title: title || fallbackTitle,
-    transcript,
-    language: language || 'Auto',
-    wordCount: transcript.split(/\s+/).filter(Boolean).length
-  });
+  const buildResult = (title, transcript, language, segments) => {
+    let transcriptWithTimes = '';
+    if (segments && segments.length > 0) {
+      transcriptWithTimes = segments.map(seg => {
+        const tSec = Math.floor(seg.tMs / 1000);
+        const m = Math.floor(tSec / 60);
+        const s = tSec % 60;
+        return `[${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}] ${seg.text}`;
+      }).join('\n');
+    }
+    
+    return {
+      success: true,
+      title: title || fallbackTitle,
+      transcript,
+      transcriptWithTimes: transcriptWithTimes || transcript,
+      language: language || 'Auto',
+      wordCount: transcript.split(/\s+/).filter(Boolean).length
+    };
+  };
 
   // Tier 1: extracción completa dentro de la página (mundo MAIN).
   let pageResult = null;
@@ -723,7 +778,7 @@ export async function getTranscriptForTab(tab) {
     }
     if (pageResult?.ok && pageResult.transcript) {
       console.info('[youtube-service] transcripción obtenida vía', pageResult.source);
-      return buildResult(pageResult.title, pageResult.transcript, pageResult.language);
+      return buildResult(pageResult.title, pageResult.transcript, pageResult.language, pageResult.segments);
     }
   } catch (e) {
     console.warn('[youtube-service] Tier 1 (MAIN world) falló:', e);
@@ -734,7 +789,7 @@ export async function getTranscriptForTab(tab) {
     const response = await chrome.tabs.sendMessage(tab.id, { action: 'EXTRACT_TRANSCRIPT' });
     if (response && response.success && response.transcript) {
       console.info('[youtube-service] transcripción obtenida vía content script');
-      return buildResult(response.title, response.transcript, response.language);
+      return buildResult(response.title, response.transcript, response.language, response.segments);
     }
     if (response && response.error) {
       console.warn('[youtube-service] content script:', response.error);
@@ -771,11 +826,11 @@ export async function getTranscriptForTab(tab) {
         tracks[0];
 
       if (preferred?.baseUrl) {
-        const text = await fetchAndParseTranscriptText(preferred.baseUrl);
-        if (text) {
+        const parsed = await fetchAndParseTranscriptText(preferred.baseUrl);
+        if (parsed && parsed.text) {
           const lang =
             preferred.name?.simpleText || preferred.name?.runs?.[0]?.text || preferred.languageCode;
-          return buildResult(data?.videoDetails?.title, text, lang);
+          return buildResult(data?.videoDetails?.title, parsed.text, lang, parsed.segments);
         }
       }
     }

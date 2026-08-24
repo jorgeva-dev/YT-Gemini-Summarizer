@@ -1,16 +1,8 @@
 import { getTranscriptForTab } from '../services/youtube-service.js';
-import {
-  GEM_URL,
-  GEMINI_APP_URL,
-  buildShortPrompt,
-  buildExtendedPrompt,
-  buildCriticalPrompt
-} from '../config/prompts.js';
 
 // DOM Elements
-const summarizeShortBtn = document.getElementById('summarizeShortBtn');
-const summarizeExtendedBtn = document.getElementById('summarizeExtendedBtn');
-const criticalAnalysisBtn = document.getElementById('criticalAnalysisBtn');
+const actionsContainer = document.getElementById('actionsContainer');
+const openOptionsBtn = document.getElementById('openOptionsBtn');
 
 // Views
 const idleState = document.getElementById('idleState');
@@ -33,7 +25,8 @@ const noticeTitle = document.getElementById('noticeTitle');
 const errorMessageText = document.getElementById('errorMessageText');
 const retryBtn = document.getElementById('retryBtn');
 
-let lastUsedMode = 'extended';
+let acciones = [];
+let lastUsedActionId = null;
 let currentFullPrompt = '';
 
 // Initialize Side Panel
@@ -43,8 +36,68 @@ document.addEventListener('DOMContentLoaded', async () => {
     await chrome.storage.local.remove(['geminiApiKey', 'selectedModel', 'geminiTabId', 'pendingPrompt']);
   } catch (e) { /* noop */ }
 
+  await loadActions();
   setupEventListeners();
+
+  // Escuchar cambios de storage (si editan desde opciones con el panel abierto)
+  chrome.storage.onChanged.addListener((changes, namespace) => {
+    if (namespace === 'local' && changes.acciones) {
+      acciones = changes.acciones.newValue || [];
+      renderActions();
+    }
+  });
 });
+
+async function loadActions() {
+  const data = await chrome.storage.local.get('acciones');
+  acciones = data.acciones || [];
+  renderActions();
+}
+
+function renderActions() {
+  actionsContainer.innerHTML = '';
+  
+  if (acciones.length === 0) {
+    actionsContainer.innerHTML = `
+      <div style="text-align:center; padding: 10px; color: var(--text-muted); font-size: 13px;">
+        No tienes acciones configuradas. <br><br>
+        <a href="#" id="linkOptions" style="color: #A855F7; text-decoration: underline;">Abrir configuración</a>
+      </div>
+    `;
+    document.getElementById('linkOptions').addEventListener('click', (e) => {
+      e.preventDefault();
+      chrome.runtime.sendMessage({ action: 'OPEN_OPTIONS' });
+    });
+    return;
+  }
+
+  acciones.forEach((acc, index) => {
+    const btn = document.createElement('button');
+    btn.className = index === 0 ? 'primary-btn' : 'secondary-action-btn';
+    
+    btn.innerHTML = `
+      <span class="btn-icon">${acc.icono || '⚡'}</span>
+      <span class="btn-text">${acc.nombre || 'Acción'}</span>
+    `;
+    
+    btn.addEventListener('click', () => handleSummarizeClick(acc));
+
+    if (acc.destino === 'gem') {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'gem-btn-wrapper';
+      wrapper.appendChild(btn);
+      
+      const sub = document.createElement('span');
+      sub.className = 'gem-subtext';
+      sub.textContent = 'Destino: Gem';
+      wrapper.appendChild(sub);
+      
+      actionsContainer.appendChild(wrapper);
+    } else {
+      actionsContainer.appendChild(btn);
+    }
+  });
+}
 
 // Switch UI State Views
 function showState(viewName) {
@@ -61,11 +114,16 @@ function showState(viewName) {
 
 // Event Listeners Setup
 function setupEventListeners() {
-  summarizeShortBtn.addEventListener('click', () => handleSummarizeClick('short'));
-  summarizeExtendedBtn.addEventListener('click', () => handleSummarizeClick('extended'));
-  criticalAnalysisBtn.addEventListener('click', () => handleSummarizeClick('critical'));
+  openOptionsBtn.addEventListener('click', () => {
+    chrome.runtime.sendMessage({ action: 'OPEN_OPTIONS' });
+  });
 
-  retryBtn.addEventListener('click', () => handleSummarizeClick(lastUsedMode));
+  retryBtn.addEventListener('click', () => {
+    if (lastUsedActionId) {
+      const action = acciones.find(a => a.id === lastUsedActionId);
+      if (action) handleSummarizeClick(action);
+    }
+  });
 
   copyTranscriptBtn.addEventListener('click', () => {
     if (!currentFullPrompt) return;
@@ -83,19 +141,16 @@ function setupEventListeners() {
 }
 
 /**
- * Manejador principal de extracción y envío según el modo seleccionado.
- * @param {'short' | 'extended' | 'critical'} mode
+ * Manejador principal de extracción y envío dinámico.
  */
-async function handleSummarizeClick(mode) {
-  lastUsedMode = mode;
+async function handleSummarizeClick(action) {
+  lastUsedActionId = action.id;
 
-  // Validar si el Gem de análisis crítico está configurado
-  if (mode === 'critical' && (!GEM_URL || !GEM_URL.trim())) {
-    showError('Configura la URL de tu Gem en src/config/prompts.js para usar el análisis crítico.');
+  // Validar
+  if (action.destino === 'gem' && (!action.gemUrl || !action.gemUrl.trim())) {
+    showError('Configura la URL de tu Gem en las Opciones para usar esta acción.');
     return;
   }
-
-  const targetUrl = mode === 'critical' ? GEM_URL.trim() : GEMINI_APP_URL.trim();
 
   // 1. Query Active Tab (YouTube)
   showState('loading');
@@ -110,7 +165,7 @@ async function handleSummarizeClick(mode) {
   }
 
   if (!activeTab.url.includes('youtube.com/watch')) {
-    showError('La pestaña activa no es un reproductor de video de YouTube. Abre un video para resumirlo.');
+    showError('La pestaña activa no es un reproductor de video de YouTube. Abre un video para usar las acciones.');
     return;
   }
 
@@ -123,15 +178,12 @@ async function handleSummarizeClick(mode) {
     return;
   }
 
-  // 3. Construir el prompt según el modo seleccionado
-  let fullPrompt = '';
-  if (mode === 'short') {
-    fullPrompt = buildShortPrompt(transcriptResponse.title, transcriptResponse.transcript);
-  } else if (mode === 'critical') {
-    fullPrompt = buildCriticalPrompt(transcriptResponse.title, transcriptResponse.transcript);
-  } else {
-    fullPrompt = buildExtendedPrompt(transcriptResponse.title, transcriptResponse.transcript);
-  }
+  // 3. Sustituir placeholders
+  let fullPrompt = action.prompt || '';
+  fullPrompt = fullPrompt.replace(/\{\{titulo\}\}/g, transcriptResponse.title || '');
+  fullPrompt = fullPrompt.replace(/\{\{transcripcion\}\}/g, transcriptResponse.transcript || '');
+  fullPrompt = fullPrompt.replace(/\{\{url\}\}/g, activeTab.url || '');
+  fullPrompt = fullPrompt.replace(/\{\{transcripcion_con_tiempos\}\}/g, transcriptResponse.transcriptWithTimes || transcriptResponse.transcript || '');
 
   currentFullPrompt = fullPrompt;
 
@@ -142,11 +194,27 @@ async function handleSummarizeClick(mode) {
     console.warn('[sidepanel] Error al copiar al portapapeles:', e);
   }
 
-  // 5. Actualizar pasos de carga
+  // Mostrar datos del video
+  videoTitleDisplay.textContent = transcriptResponse.title;
+  metaLang.textContent = `Idioma: ${transcriptResponse.language || 'Auto'}`;
+  metaWords.textContent = `~${transcriptResponse.wordCount || 0} palabras`;
+
+  // 5. Destino Portapapeles
+  if (action.destino === 'portapapeles') {
+    noticeTitle.textContent = `✨ Copiado (${action.nombre})`;
+    document.querySelector('.notice-text').textContent = 'El contenido no se envió a ninguna parte, solo se ha copiado en tu portapapeles.';
+    document.querySelector('.notice-subtext').innerHTML = 'Pégalo donde necesites con <strong>Cmd + V</strong> (o <strong>Ctrl + V</strong>).';
+    showState('success');
+    return;
+  }
+
+  // 6. Actualizar pasos de carga
   stepTranscript.classList.remove('active');
   stepGemini.classList.add('active');
 
-  // 6. Abrir SIEMPRE una nueva pestaña de Gemini y registrar el prompt asociado a su tabId
+  // 7. Abrir pestaña de Gemini y registrar el prompt asociado a su tabId
+  const targetUrl = action.destino === 'gem' ? action.gemUrl.trim() : 'https://gemini.google.com/app';
+
   try {
     const newTab = await chrome.tabs.create({
       windowId: activeTab.windowId,
@@ -170,14 +238,14 @@ async function handleSummarizeClick(mode) {
       pendingPrompts[newTab.id] = {
         text: fullPrompt,
         title: transcriptResponse.title,
-        mode,
+        mode: action.nombre,
         createdAt: now
       };
 
       await chrome.storage.local.set({ pendingPrompts });
     }
 
-    // Cerrar únicamente el widget/side panel lateral (manteniendo la pestaña de YouTube abierta)
+    // Cerrar el side panel lateral
     setTimeout(() => {
       window.close();
     }, 100);
@@ -186,19 +254,12 @@ async function handleSummarizeClick(mode) {
     console.error('[sidepanel] Error al abrir pestaña de Gemini:', e);
   }
 
-  // 7. Actualizar texto de estado de éxito (por si window.close se demorase)
-  videoTitleDisplay.textContent = transcriptResponse.title;
-  metaLang.textContent = `Idioma: ${transcriptResponse.language || 'Auto'}`;
-  metaWords.textContent = `~${transcriptResponse.wordCount || 0} palabras`;
-
-  const modeLabels = {
-    short: 'Resumen corto',
-    extended: 'Resumen extendido',
-    critical: 'Análisis crítico'
-  };
+  // 8. Actualizar texto de estado de éxito (por si window.close se demorase)
   if (noticeTitle) {
-    noticeTitle.textContent = `✨ Enviado a Gemini (${modeLabels[mode] || mode})`;
+    noticeTitle.textContent = `✨ Enviado a Gemini (${action.nombre})`;
   }
+  document.querySelector('.notice-text').textContent = 'Se ha abierto una nueva pestaña a la derecha en Gemini con el contenido correspondiente.';
+  document.querySelector('.notice-subtext').innerHTML = 'Si el pegado automático fallara, el contenido ya está copiado: sólo pulsa <strong>Cmd + V</strong> (o <strong>Ctrl + V</strong>) en el chat.';
 
   showState('success');
 }
