@@ -70,7 +70,10 @@ function decodeEntities(str) {
 async function fetchAndParseTranscriptText(baseUrl) {
   const response = await fetch(baseUrl);
   if (!response.ok) {
-    throw new Error(`Error HTTP ${response.status} al descargar subtítulos.`);
+    throw new Error(
+      chrome.i18n.getMessage('errorHttpDownload', [String(response.status)]) ||
+      `Error HTTP ${response.status} al descargar subtítulos.`
+    );
   }
 
   const rawText = await response.text();
@@ -733,15 +736,16 @@ async function pageTranscriptExtractor() {
  */
 export async function getTranscriptForTab(tab) {
   if (!tab || !tab.url) {
-    throw new Error('No se pudo acceder a la pestaña activa.');
+    throw new Error(chrome.i18n.getMessage('errorActiveTab') || 'No se pudo acceder a la pestaña activa.');
   }
 
   const videoId = extractVideoId(tab.url);
   if (!videoId) {
-    throw new Error('No se detectó un ID de video de YouTube válido en la URL.');
+    throw new Error(chrome.i18n.getMessage('errorInvalidVideoId') || 'No se detectó un ID de video de YouTube válido en la URL.');
   }
 
-  const fallbackTitle = tab.title ? tab.title.replace(/-\s*YouTube$/i, '').trim() : 'Video de YouTube';
+  const defaultTitle = chrome.i18n.getMessage('defaultVideoTitle') || 'Video de YouTube';
+  const fallbackTitle = tab.title ? tab.title.replace(/-\s*YouTube$/i, '').trim() : defaultTitle;
 
   const buildResult = (title, transcript, language, segments) => {
     let transcriptWithTimes = '';
@@ -839,12 +843,13 @@ export async function getTranscriptForTab(tab) {
   }
 
   if (pageResult && pageResult.hasTracks === false) {
-    throw new Error('Este video no tiene subtítulos ni transcripción disponibles.');
+    throw new Error(chrome.i18n.getMessage('errorNoSubtitles') || 'Este video no tiene subtítulos ni transcripción disponibles.');
   }
 
   throw new Error(
-    'El video tiene subtítulos, pero YouTube devolvió la transcripción vacía. ' +
+    chrome.i18n.getMessage('errorEmptyTranscript') ||
+    ('El video tiene subtítulos, pero YouTube devolvió la transcripción vacía. ' +
     'Recarga la página del video (F5) e inténtalo de nuevo; si persiste, abre ' +
-    '"Mostrar transcripción" bajo la descripción y vuelve a pulsar Resumir.'
+    '"Mostrar transcripción" bajo la descripción y vuelve a pulsar Resumir.')
   );
 }

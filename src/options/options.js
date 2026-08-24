@@ -1,3 +1,6 @@
+import { applyI18n } from '../lib/i18n.js';
+import { getDefaultActions } from '../config/default-actions.js';
+
 let acciones = [];
 let editingId = null;
 
@@ -16,7 +19,10 @@ const gemUrlGroup = document.getElementById('gemUrlGroup');
 const toastMessage = document.getElementById('toastMessage');
 
 // Init
-document.addEventListener('DOMContentLoaded', loadActions);
+document.addEventListener('DOMContentLoaded', () => {
+  applyI18n();
+  loadActions();
+});
 
 async function loadActions() {
   const data = await chrome.storage.local.get('acciones');
@@ -35,9 +41,13 @@ function renderList() {
   actionsList.innerHTML = '';
   
   if (acciones.length === 0) {
-    actionsList.innerHTML = '<p style="color: var(--text-muted); font-size: 13px;">No tienes acciones configuradas.</p>';
+    const noActionsText = chrome.i18n.getMessage('noActionsConfigured') || 'No tienes acciones configuradas.';
+    actionsList.innerHTML = `<p style="color: var(--text-muted); font-size: 13px;">${noActionsText}</p>`;
     return;
   }
+
+  const moveUpTitle = chrome.i18n.getMessage('btnMoveUpTitle') || 'Subir';
+  const moveDownTitle = chrome.i18n.getMessage('btnMoveDownTitle') || 'Bajar';
 
   acciones.forEach((acc, index) => {
     const item = document.createElement('div');
@@ -49,8 +59,8 @@ function renderList() {
         <span class="action-title">${acc.nombre}</span>
       </div>
       <div class="action-controls">
-        <button type="button" title="Subir" data-action="up" data-index="${index}" ${index === 0 ? 'disabled style="opacity:0.3;"' : ''}>▲</button>
-        <button type="button" title="Bajar" data-action="down" data-index="${index}" ${index === acciones.length - 1 ? 'disabled style="opacity:0.3;"' : ''}>▼</button>
+        <button type="button" title="${moveUpTitle}" data-action="up" data-index="${index}" ${index === 0 ? 'disabled style="opacity:0.3;"' : ''}>▲</button>
+        <button type="button" title="${moveDownTitle}" data-action="down" data-index="${index}" ${index === acciones.length - 1 ? 'disabled style="opacity:0.3;"' : ''}>▼</button>
       </div>
     `;
 
@@ -115,16 +125,11 @@ actionDestSelect.addEventListener('change', () => {
   if (actionDestSelect.value === 'gem') {
     const currentPrompt = actionPromptInput.value.trim();
     if (currentPrompt === '' || currentPrompt === '{{transcripcion}}') {
-      actionPromptInput.value = `Analiza la transcripción del vídeo de YouTube que va debajo aplicando tu método habitual. No te presentes ni me preguntes qué analizar: el material es este texto.
-
-Título: {{titulo}}
-URL: {{url}}
-
-TRANSCRIPCIÓN:
-{{transcripcion}}`;
+      actionPromptInput.value = chrome.i18n.getMessage('gemDefaultPrompt') || `Analiza la transcripción del vídeo de YouTube que va debajo aplicando tu método habitual. No te presentes ni me preguntes qué analizar: el material es este texto.\n\nTítulo: {{titulo}}\nURL: {{url}}\n\nTRANSCRIPCIÓN:\n{{transcripcion}}`;
     }
   }
 });
+
 function toggleGemUrlVisibility() {
   if (actionDestSelect.value === 'gem') {
     gemUrlGroup.classList.remove('hidden');
@@ -139,7 +144,7 @@ function toggleGemUrlVisibility() {
 document.getElementById('newActionBtn').addEventListener('click', () => {
   const newAction = {
     id: crypto.randomUUID(),
-    nombre: 'Nueva acción',
+    nombre: chrome.i18n.getMessage('newActionDefaultName') || 'Nueva acción',
     icono: '✨',
     destino: 'app',
     prompt: '{{transcripcion}}'
@@ -168,18 +173,19 @@ editForm.addEventListener('submit', async (e) => {
   };
 
   await saveActions();
-  showToast('Acción guardada correctamente.', 'success');
+  showToast(chrome.i18n.getMessage('toastActionSaved') || 'Acción guardada correctamente.', 'success');
   renderList();
 });
 
 // Delete
 document.getElementById('deleteBtn').addEventListener('click', async () => {
   const id = actionIdInput.value;
-  if (confirm('¿Seguro que quieres eliminar esta acción?')) {
+  const confirmMsg = chrome.i18n.getMessage('confirmDeleteAction') || '¿Seguro que quieres eliminar esta acción?';
+  if (confirm(confirmMsg)) {
     acciones = acciones.filter(a => a.id !== id);
     await saveActions();
     closeEditor();
-    showToast('Acción eliminada.', 'success');
+    showToast(chrome.i18n.getMessage('toastActionDeleted') || 'Acción eliminada.', 'success');
   }
 });
 
@@ -192,14 +198,14 @@ async function saveActions() {
 // Import / Export / Restore
 document.getElementById('exportBtn').addEventListener('click', () => {
   if (acciones.length === 0) {
-    showToast('No hay acciones para exportar.', 'error');
+    showToast(chrome.i18n.getMessage('toastNoActionsExport') || 'No hay acciones para exportar.', 'error');
     return;
   }
   const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(acciones, null, 2));
   const downloadAnchorNode = document.createElement('a');
   downloadAnchorNode.setAttribute("href", dataStr);
   downloadAnchorNode.setAttribute("download", "youtube-gemini-acciones.json");
-  document.body.appendChild(downloadAnchorNode); // required for firefox
+  document.body.appendChild(downloadAnchorNode);
   downloadAnchorNode.click();
   downloadAnchorNode.remove();
 });
@@ -216,18 +222,23 @@ document.getElementById('fileInput').addEventListener('change', (e) => {
   reader.onload = async (event) => {
     try {
       const imported = JSON.parse(event.target.result);
-      if (!Array.isArray(imported)) throw new Error('El archivo no contiene un array válido.');
+      if (!Array.isArray(imported)) {
+        throw new Error(chrome.i18n.getMessage('errorImportNotArray') || 'El archivo no contiene un array válido.');
+      }
       
       // Basic validation
       const valid = imported.every(a => a.id && a.nombre && a.destino && a.prompt);
-      if (!valid) throw new Error('El formato de las acciones importadas no es correcto.');
+      if (!valid) {
+        throw new Error(chrome.i18n.getMessage('errorImportInvalidFormat') || 'El formato de las acciones importadas no es correcto.');
+      }
 
       acciones = imported;
       await saveActions();
       closeEditor();
-      showToast('Acciones importadas correctamente.', 'success');
+      showToast(chrome.i18n.getMessage('toastImportSuccess') || 'Acciones importadas correctamente.', 'success');
     } catch (err) {
-      showToast('Error al importar: ' + err.message, 'error');
+      const errMsg = chrome.i18n.getMessage('toastImportError', [err.message]) || ('Error al importar: ' + err.message);
+      showToast(errMsg, 'error');
     }
   };
   reader.readAsText(file);
@@ -235,57 +246,12 @@ document.getElementById('fileInput').addEventListener('change', (e) => {
 });
 
 document.getElementById('restoreBtn').addEventListener('click', async () => {
-  if (confirm('¿Seguro que quieres restaurar las acciones por defecto? Esto sobreescribirá tus acciones actuales.')) {
-    await chrome.storage.local.remove('acciones');
-    // Call the background worker to re-seed? The easiest is to just re-seed directly here.
-    const defaultActions = [
-      {
-        id: crypto.randomUUID(),
-        nombre: 'Resumen corto',
-        icono: '⚡',
-        destino: 'app',
-        prompt: 'Por favor, elabora un resumen breve en español de aproximadamente 8 a 10 líneas de la transcripción del siguiente vídeo de YouTube titulado "{{titulo}}".\n\nEscribe el resumen en prosa corrida, en un único bloque de texto sin encabezados, sin viñetas y sin introducciones ni preámbulos. Céntrate únicamente en extraer el contenido esencial del vídeo.\n\n---\n\nTRANSCRIPCIÓN COMPLETA:\n{{transcripcion}}'
-      },
-      {
-        id: crypto.randomUUID(),
-        nombre: 'Resumen extendido',
-        icono: '📋',
-        destino: 'app',
-        prompt: 'Por favor, analiza la siguiente transcripción del vídeo de YouTube titulado "{{titulo}}" y genera:\n\n1. Un resumen ejecutivo (3-4 frases).\n2. Los 5-7 puntos clave con viñetas explicativas.\n3. Conclusiones o \'takeaways\' accionables.\n\nFormatea todo con Markdown claro utilizando encabezados H2 y H3, y negrita para los conceptos importantes.\n\n---\n\nTRANSCRIPCIÓN COMPLETA:\n{{transcripcion}}'
-      },
-      {
-        id: crypto.randomUUID(),
-        nombre: 'Preguntar al vídeo',
-        icono: '💬',
-        destino: 'app',
-        prompt: 'Título del vídeo: "{{titulo}}"\n\nTranscripción:\n{{transcripcion}}\n\nConfirma en una sola línea que has leído la transcripción y que estás listo para responder preguntas. No resumas nada todavía ni añadas ninguna otra información.'
-      },
-      {
-        id: crypto.randomUUID(),
-        nombre: 'Datos y referencias',
-        icono: '🔢',
-        destino: 'app',
-        prompt: 'A partir del vídeo "{{titulo}}" y la siguiente transcripción, extrae únicamente la información verificable que se cite explícitamente: cifras y estadísticas, estudios o fuentes, nombres propios, libros, herramientas y enlaces mencionados.\n\nPreséntalo en una lista, indicando claramente si alguna afirmación importante carece de fuente citada en el vídeo. No incluyas opiniones ni resúmenes.\n\nTranscripción:\n{{transcripcion}}'
-      },
-      {
-        id: crypto.randomUUID(),
-        nombre: 'Copiar transcripción',
-        icono: '📄',
-        destino: 'portapapeles',
-        prompt: '{{transcripcion}}'
-      },
-      {
-        id: crypto.randomUUID(),
-        nombre: 'Índice con minutos',
-        icono: '🕒',
-        destino: 'app',
-        prompt: 'A continuación tienes la transcripción del vídeo "{{titulo}}" con marcas de tiempo. Crea un índice de secciones para el vídeo, indicando el minuto de inicio y una frase de descripción para cada sección. Añade además al final de cada ítem del índice un enlace con este formato exacto para que yo pueda hacer clic y saltar a ese momento del vídeo: {{url}}&t=SEGUNDOSs (sustituyendo SEGUNDOS por los segundos totales, por ejemplo &t=125s).\n\nTranscripción:\n{{transcripcion_con_tiempos}}'
-      }
-    ];
-    acciones = defaultActions;
+  const confirmMsg = chrome.i18n.getMessage('confirmRestoreDefaults') || '¿Seguro que quieres restaurar las acciones por defecto? Esto sobreescribirá tus acciones actuales.';
+  if (confirm(confirmMsg)) {
+    acciones = getDefaultActions();
     await saveActions();
     closeEditor();
-    showToast('Acciones restauradas por defecto.', 'success');
+    showToast(chrome.i18n.getMessage('toastActionsRestored') || 'Acciones restauradas por defecto.', 'success');
   }
 });
 

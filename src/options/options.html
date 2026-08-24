@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Acciones - YouTube Gemini</title>
+  <title data-i18n="optionsPageTitle">Acciones - YouTube Gemini</title>
   <style>
     :root {
       --bg-main: #0B0F19;
@@ -275,25 +275,25 @@
 
   <div class="layout">
     <aside class="sidebar">
-      <h2>Tus Acciones</h2>
+      <h2 data-i18n="optionsSidebarTitle">Tus Acciones</h2>
       
       <div id="actionsList" class="actions-list">
         <!-- Generado dinámicamente -->
       </div>
       
-      <button id="newActionBtn" class="btn btn-primary">+ Nueva Acción</button>
+      <button id="newActionBtn" class="btn btn-primary" data-i18n="btnNewAction">+ Nueva Acción</button>
       
       <div class="tools-box">
-        <button id="importBtn" class="btn btn-secondary">Importar JSON</button>
-        <button id="exportBtn" class="btn btn-secondary">Exportar JSON</button>
-        <button id="restoreBtn" class="btn btn-danger">Restaurar por defecto</button>
+        <button id="importBtn" class="btn btn-secondary" data-i18n="btnImport">Importar JSON</button>
+        <button id="exportBtn" class="btn btn-secondary" data-i18n="btnExport">Exportar JSON</button>
+        <button id="restoreBtn" class="btn btn-danger" data-i18n="btnRestore">Restaurar por defecto</button>
         <input type="file" id="fileInput" accept=".json" class="hidden">
       </div>
     </aside>
 
     <main class="editor-area">
       <div id="emptyState" class="empty-state">
-        <p>Selecciona una acción para editar o crea una nueva.</p>
+        <p data-i18n="optionsEmptyState">Selecciona una acción para editar o crea una nueva.</p>
       </div>
 
       <form id="editForm" class="edit-form hidden">
@@ -301,35 +301,35 @@
         
         <div class="form-row">
           <div class="form-group" style="flex:1;">
-            <label for="actionName">Nombre de la acción</label>
-            <input type="text" id="actionName" required placeholder="Ej: Resumen corto">
+            <label for="actionName" data-i18n="labelActionName">Nombre de la acción</label>
+            <input type="text" id="actionName" required data-i18n-placeholder="placeholderActionName" placeholder="Ej: Resumen corto">
           </div>
           <div class="form-group" style="width: 80px;">
-            <label for="actionIcon">Icono</label>
+            <label for="actionIcon" data-i18n="labelActionIcon">Icono</label>
             <input type="text" id="actionIcon" maxlength="2" required placeholder="⚡">
           </div>
         </div>
 
         <div class="form-group">
-          <label for="actionDest">Destino</label>
+          <label for="actionDest" data-i18n="labelActionDest">Destino</label>
           <select id="actionDest" required>
-            <option value="app">Gemini App (Nueva pestaña)</option>
-            <option value="gem">Gem Personalizado (Nueva pestaña)</option>
-            <option value="portapapeles">Solo copiar al portapapeles</option>
+            <option value="app" data-i18n="destOptionApp">Gemini App (Nueva pestaña)</option>
+            <option value="gem" data-i18n="destOptionGem">Gem Personalizado (Nueva pestaña)</option>
+            <option value="portapapeles" data-i18n="destOptionClipboard">Solo copiar al portapapeles</option>
           </select>
         </div>
         
         <div class="form-group hidden" id="gemUrlGroup">
-          <label for="actionGemUrl">URL del Gem</label>
-          <input type="url" id="actionGemUrl" placeholder="https://gemini.google.com/gem/...">
-          <p class="help-text">Abre tu Gem en gemini.google.com y copia la URL de la barra de direcciones. Importante: incluye en el prompt una instrucción breve diciéndole al Gem que analice el texto de abajo y que no se presente ni pregunte qué analizar. Si envías sólo la transcripción, muchos Gems responden con su mensaje de bienvenida y la ignoran. No le indiques cómo analizar ni qué formato usar: de eso ya se encarga el Gem.</p>
+          <label for="actionGemUrl" data-i18n="labelGemUrl">URL del Gem</label>
+          <input type="url" id="actionGemUrl" data-i18n-placeholder="placeholderGemUrl" placeholder="https://gemini.google.com/gem/...">
+          <p class="help-text" data-i18n="helpGemUrl">Abre tu Gem en gemini.google.com y copia la URL de la barra de direcciones. Importante: incluye en el prompt una instrucción breve diciéndole al Gem que analice el texto de abajo y que no se presente ni pregunte qué analizar. Si envías sólo la transcripción, muchos Gems responden con su mensaje de bienvenida y la ignoran. No le indiques cómo analizar ni qué formato usar: de eso ya se encarga el Gem.</p>
         </div>
 
         <div class="form-group">
-          <label for="actionPrompt">Prompt / Plantilla</label>
+          <label for="actionPrompt" data-i18n="labelActionPrompt">Prompt / Plantilla</label>
           <textarea id="actionPrompt" rows="12" required></textarea>
           <div class="placeholders-help">
-            <strong>Placeholders disponibles:</strong>
+            <strong data-i18n="placeholdersHelpTitle">Placeholders disponibles:</strong>
             <code>{{titulo}}</code>
             <code>{{transcripcion}}</code>
             <code>{{url}}</code>
@@ -338,8 +338,8 @@
         </div>
 
         <div class="form-actions">
-          <button type="submit" class="btn btn-primary">Guardar Cambios</button>
-          <button type="button" id="deleteBtn" class="btn btn-danger">Eliminar Acción</button>
+          <button type="submit" class="btn btn-primary" data-i18n="btnSaveAction">Guardar Cambios</button>
+          <button type="button" id="deleteBtn" class="btn btn-danger" data-i18n="btnDeleteAction">Eliminar Acción</button>
         </div>
       </form>
     </main>

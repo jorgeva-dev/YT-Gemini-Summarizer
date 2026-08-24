@@ -1,0 +1,406 @@
+{
+  "extName": {
+    "message": "YouTube Gemini Summarizer",
+    "description": "Nombre de la extensión"
+  },
+  "extDescription": {
+    "message": "Extrae transcripciones de videos de YouTube y las envía directamente a Google Gemini Web.",
+    "description": "Descripción de la extensión"
+  },
+  "actionTitle": {
+    "message": "Abrir Resumidor YouTube Gemini",
+    "description": "Título por defecto del botón de acción en la barra de extensiones"
+  },
+  "btnConfigureActionsTitle": {
+    "message": "Configurar Acciones",
+    "description": "Tooltip del botón de configuración en la cabecera del panel lateral"
+  },
+  "loadingActions": {
+    "message": "Cargando acciones...",
+    "description": "Texto mostrado mientras se cargan las acciones desde storage"
+  },
+  "idleTitle": {
+    "message": "Listo para resumir",
+    "description": "Título en el estado inicial de espera del panel lateral"
+  },
+  "idleDesc": {
+    "message": "Navega a un vídeo de YouTube y elige la modalidad de resumen o análisis que prefieras.",
+    "description": "Descripción en el estado inicial de espera del panel lateral"
+  },
+  "loadingTitle": {
+    "message": "Procesando Video",
+    "description": "Título principal en el estado de carga del panel lateral"
+  },
+  "stepExtractingTranscript": {
+    "message": "Extrayendo transcripción de YouTube...",
+    "description": "Etiqueta del paso de extracción de transcripción"
+  },
+  "stepOpeningGemini": {
+    "message": "Abriendo Gemini y pegando...",
+    "description": "Etiqueta del paso de apertura de Gemini y pegado"
+  },
+  "defaultVideoTitle": {
+    "message": "Título del Video",
+    "description": "Título de video por defecto si no se detecta nombre"
+  },
+  "btnCopyTranscriptTitle": {
+    "message": "Copiar transcripción al portapapeles",
+    "description": "Tooltip del botón de copiar transcripción en la barra de herramientas"
+  },
+  "btnCopyTranscript": {
+    "message": "Copiar transcripción",
+    "description": "Texto del botón de copiar transcripción en la barra de herramientas"
+  },
+  "btnCopied": {
+    "message": "¡Copiado!",
+    "description": "Texto temporal mostrado al pulsar copiar transcripción"
+  },
+  "noticeSentGeminiDefault": {
+    "message": "✨ Enviado a Gemini Web",
+    "description": "Título por defecto del aviso de envío a Gemini"
+  },
+  "noticeSentGeminiActionTitle": {
+    "message": "✨ Enviado a Gemini ($ACTION_NAME$)",
+    "description": "Título del aviso indicando el nombre de la acción enviada a Gemini",
+    "placeholders": {
+      "action_name": {
+        "content": "$1",
+        "example": "Resumen corto"
+      }
+    }
+  },
+  "noticeSentGeminiText": {
+    "message": "Se ha abierto una nueva pestaña a la derecha en Gemini con el contenido correspondiente.",
+    "description": "Texto del aviso informando de la apertura de pestaña en Gemini"
+  },
+  "noticeSentGeminiSubtext": {
+    "message": "Si el pegado automático fallara en la página, el contenido ya está copiado en tu portapapeles: sólo pulsa <strong>Cmd + V</strong> (o <strong>Ctrl + V</strong>) en el chat.",
+    "description": "Subtexto de ayuda indicando el atajo para pegar en Gemini"
+  },
+  "noticeSentGeminiSubtextShort": {
+    "message": "Si el pegado automático fallara, el contenido ya está copiado: sólo pulsa <strong>Cmd + V</strong> (o <strong>Ctrl + V</strong>) en el chat.",
+    "description": "Subtexto corto de ayuda para pegar en Gemini"
+  },
+  "noticeCopiedTitle": {
+    "message": "✨ Copiado ($ACTION_NAME$)",
+    "description": "Título del aviso cuando la acción copia directamente al portapapeles",
+    "placeholders": {
+      "action_name": {
+        "content": "$1",
+        "example": "Copiar transcripción"
+      }
+    }
+  },
+  "noticeCopiedText": {
+    "message": "El contenido no se envió a ninguna parte, solo se ha copiado en tu portapapeles.",
+    "description": "Texto del aviso cuando el destino es solo el portapapeles"
+  },
+  "noticeCopiedSubtext": {
+    "message": "Pégalo donde necesites con <strong>Cmd + V</strong> (o <strong>Ctrl + V</strong>).",
+    "description": "Subtexto del aviso indicando cómo pegar el contenido del portapapeles"
+  },
+  "metaLang": {
+    "message": "Idioma: $LANG$",
+    "description": "Metadatos con el idioma de la transcripción",
+    "placeholders": {
+      "lang": {
+        "content": "$1",
+        "example": "ES"
+      }
+    }
+  },
+  "metaWords": {
+    "message": "~$COUNT$ palabras",
+    "description": "Metadatos con el recuento aproximado de palabras",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "1200"
+      }
+    }
+  },
+  "langAuto": {
+    "message": "Auto",
+    "description": "Etiqueta para idioma detectado automáticamente"
+  },
+  "errorTitle": {
+    "message": "Ocurrió un Problema",
+    "description": "Título en la vista de error"
+  },
+  "errorDefaultMessage": {
+    "message": "No se pudo procesar la solicitud.",
+    "description": "Mensaje genérico por defecto en caso de error"
+  },
+  "btnRetry": {
+    "message": "Reintentar",
+    "description": "Texto del botón de reintento en la vista de error"
+  },
+  "footerText": {
+    "message": "Local-First • Manifest V3",
+    "description": "Texto del pie de página en el panel lateral"
+  },
+  "noActionsConfigured": {
+    "message": "No tienes acciones configuradas.",
+    "description": "Aviso cuando la lista de acciones está vacía"
+  },
+  "openConfigLink": {
+    "message": "Abrir configuración",
+    "description": "Texto del enlace para abrir opciones desde el panel vacío"
+  },
+  "fallbackActionName": {
+    "message": "Acción",
+    "description": "Nombre por defecto de una acción si carece de nombre"
+  },
+  "gemDestinationSubtext": {
+    "message": "Destino: Gem",
+    "description": "Subtexto mostrado bajo botones de acción dirigidos a un Gem"
+  },
+  "errorGemUrlMissing": {
+    "message": "Configura la URL de tu Gem en las Opciones para usar esta acción.",
+    "description": "Error al pulsar una acción de Gem sin URL configurada"
+  },
+  "errorActiveTab": {
+    "message": "No se pudo acceder a la pestaña activa.",
+    "description": "Error al no poder consultar la pestaña activa"
+  },
+  "errorNotYouTube": {
+    "message": "La pestaña activa no es un reproductor de video de YouTube. Abre un video para usar las acciones.",
+    "description": "Error cuando la pestaña activa no es un video de YouTube"
+  },
+  "errorGetTranscriptFallback": {
+    "message": "No se pudo obtener la transcripción del video.",
+    "description": "Error genérico de captura de transcripción"
+  },
+  "errorInvalidVideoId": {
+    "message": "No se detectó un ID de video de YouTube válido en la URL.",
+    "description": "Error cuando la URL no contiene un ID de video de YouTube válido"
+  },
+  "errorNoSubtitles": {
+    "message": "Este video no tiene subtítulos ni transcripción disponibles.",
+    "description": "Error cuando el video no tiene subtítulos ni transcripción"
+  },
+  "errorEmptyTranscript": {
+    "message": "El video tiene subtítulos, pero YouTube devolvió la transcripción vacía. Recarga la página del video (F5) e inténtalo de nuevo; si persiste, abre \"Mostrar transcripción\" bajo la descripción y vuelve a pulsar Resumir.",
+    "description": "Error cuando YouTube devuelve transcripción vacía a pesar de existir pistas"
+  },
+  "errorHttpDownload": {
+    "message": "Error HTTP $STATUS$ al descargar subtítulos.",
+    "description": "Error HTTP al descargar subtítulos",
+    "placeholders": {
+      "status": {
+        "content": "$1",
+        "example": "404"
+      }
+    }
+  },
+  "errorOpenYouTubeWatch": {
+    "message": "Por favor, abre una página de reproductor de video de YouTube (youtube.com/watch?v=...)",
+    "description": "Error en el content script cuando no se está en una URL de reproducción de YouTube"
+  },
+  "errorNoSubtitlesContent": {
+    "message": "No se encontraron subtítulos o transcripción en este video. Es posible que el creador no haya habilitado subtítulos.",
+    "description": "Error en el content script cuando la lista de pistas está vacía"
+  },
+  "errorEmptyTranscriptReload": {
+    "message": "El video tiene subtítulos pero YouTube devolvió el contenido vacío. Recarga la página e inténtalo de nuevo.",
+    "description": "Error en el content script cuando el timedtext y el panel están vacíos"
+  },
+  "errorUnknownExtraction": {
+    "message": "Error desconocido al extraer la transcripción.",
+    "description": "Error en content script por excepción no controlada"
+  },
+  "optionsPageTitle": {
+    "message": "Acciones - YouTube Gemini",
+    "description": "Título de la pestaña de opciones"
+  },
+  "optionsSidebarTitle": {
+    "message": "Tus Acciones",
+    "description": "Título de la barra lateral en la página de opciones"
+  },
+  "btnNewAction": {
+    "message": "+ Nueva Acción",
+    "description": "Botón para crear una nueva acción"
+  },
+  "btnImport": {
+    "message": "Importar JSON",
+    "description": "Botón para importar acciones desde archivo JSON"
+  },
+  "btnExport": {
+    "message": "Exportar JSON",
+    "description": "Botón para exportar acciones a archivo JSON"
+  },
+  "btnRestore": {
+    "message": "Restaurar por defecto",
+    "description": "Botón para restaurar acciones por defecto"
+  },
+  "optionsEmptyState": {
+    "message": "Selecciona una acción para editar o crea una nueva.",
+    "description": "Texto mostrado en opciones cuando no hay acción seleccionada"
+  },
+  "labelActionName": {
+    "message": "Nombre de la acción",
+    "description": "Etiqueta del campo nombre de la acción"
+  },
+  "placeholderActionName": {
+    "message": "Ej: Resumen corto",
+    "description": "Placeholder del campo nombre de la acción"
+  },
+  "labelActionIcon": {
+    "message": "Icono",
+    "description": "Etiqueta del campo icono de la acción"
+  },
+  "labelActionDest": {
+    "message": "Destino",
+    "description": "Etiqueta del selector de destino"
+  },
+  "destOptionApp": {
+    "message": "Gemini App (Nueva pestaña)",
+    "description": "Opción de destino aplicación principal de Gemini"
+  },
+  "destOptionGem": {
+    "message": "Gem Personalizado (Nueva pestaña)",
+    "description": "Opción de destino Gem personalizado"
+  },
+  "destOptionClipboard": {
+    "message": "Solo copiar al portapapeles",
+    "description": "Opción de destino solo portapapeles"
+  },
+  "labelGemUrl": {
+    "message": "URL del Gem",
+    "description": "Etiqueta del campo de URL del Gem"
+  },
+  "placeholderGemUrl": {
+    "message": "https://gemini.google.com/gem/...",
+    "description": "Placeholder del campo de URL del Gem"
+  },
+  "helpGemUrl": {
+    "message": "Abre tu Gem en gemini.google.com y copia la URL de la barra de direcciones. Importante: incluye en el prompt una instrucción breve diciéndole al Gem que analice el texto de abajo y que no se presente ni pregunte qué analizar. Si envías sólo la transcripción, muchos Gems responden con su mensaje de bienvenida y la ignoran. No le indiques cómo analizar ni qué formato usar: de eso ya se encarga el Gem.",
+    "description": "Texto explicativo sobre cómo configurar la URL y el prompt de un Gem"
+  },
+  "labelActionPrompt": {
+    "message": "Prompt / Plantilla",
+    "description": "Etiqueta del campo de texto de plantilla del prompt"
+  },
+  "placeholdersHelpTitle": {
+    "message": "Placeholders disponibles:",
+    "description": "Título del bloque de ayuda con los placeholders disponibles"
+  },
+  "btnSaveAction": {
+    "message": "Guardar Cambios",
+    "description": "Botón para guardar los cambios del formulario de acción"
+  },
+  "btnDeleteAction": {
+    "message": "Eliminar Acción",
+    "description": "Botón para eliminar la acción seleccionada"
+  },
+  "btnMoveUpTitle": {
+    "message": "Subir",
+    "description": "Tooltip del botón para mover una acción hacia arriba en la lista"
+  },
+  "btnMoveDownTitle": {
+    "message": "Bajar",
+    "description": "Tooltip del botón para mover una acción hacia abajo en la lista"
+  },
+  "toastActionSaved": {
+    "message": "Acción guardada correctamente.",
+    "description": "Toast mostrado tras guardar una acción con éxito"
+  },
+  "confirmDeleteAction": {
+    "message": "¿Seguro que quieres eliminar esta acción?",
+    "description": "Pregunta de confirmación antes de eliminar una acción"
+  },
+  "toastActionDeleted": {
+    "message": "Acción eliminada.",
+    "description": "Toast mostrado tras eliminar una acción con éxito"
+  },
+  "toastNoActionsExport": {
+    "message": "No hay acciones para exportar.",
+    "description": "Toast de error cuando se intenta exportar una lista vacía"
+  },
+  "confirmRestoreDefaults": {
+    "message": "¿Seguro que quieres restaurar las acciones por defecto? Esto sobreescribirá tus acciones actuales.",
+    "description": "Pregunta de confirmación antes de restaurar las acciones iniciales"
+  },
+  "toastActionsRestored": {
+    "message": "Acciones restauradas por defecto.",
+    "description": "Toast mostrado tras restaurar las acciones por defecto"
+  },
+  "toastImportSuccess": {
+    "message": "Acciones importadas correctamente.",
+    "description": "Toast mostrado tras importar acciones con éxito"
+  },
+  "errorImportNotArray": {
+    "message": "El archivo no contiene un array válido.",
+    "description": "Error al importar un archivo que no es un array JSON"
+  },
+  "errorImportInvalidFormat": {
+    "message": "El formato de las acciones importadas no es correcto.",
+    "description": "Error al importar acciones a las que les faltan propiedades requeridas"
+  },
+  "toastImportError": {
+    "message": "Error al importar: $ERROR$",
+    "description": "Toast de error al fallar la importación de acciones",
+    "placeholders": {
+      "error": {
+        "content": "$1",
+        "example": "JSON inválido"
+      }
+    }
+  },
+  "newActionDefaultName": {
+    "message": "Nueva acción",
+    "description": "Nombre por defecto al crear una acción nueva"
+  },
+  "gemDefaultPrompt": {
+    "message": "Analiza la transcripción del vídeo de YouTube que va debajo aplicando tu método habitual. No te presentes ni me preguntes qué analizar: el material es este texto.\n\nTítulo: {{titulo}}\nURL: {{url}}\n\nTRANSCRIPCIÓN:\n{{transcripcion}}",
+    "description": "Plantilla por defecto sugerida al cambiar el destino a Gem"
+  },
+  "actionShortSummaryName": {
+    "message": "Resumen corto",
+    "description": "Nombre de la acción por defecto Resumen corto"
+  },
+  "actionShortSummaryPrompt": {
+    "message": "Por favor, elabora un resumen breve en español de aproximadamente 8 a 10 líneas de la transcripción del siguiente vídeo de YouTube titulado \"{{titulo}}\".\n\nEscribe el resumen en prosa corrida, en un único bloque de texto sin encabezados, sin viñetas y sin introducciones ni preámbulos. Céntrate únicamente en extraer el contenido esencial del vídeo.\n\n---\n\nTRANSCRIPCIÓN COMPLETA:\n{{transcripcion}}",
+    "description": "Prompt de la acción por defecto Resumen corto"
+  },
+  "actionExtendedSummaryName": {
+    "message": "Resumen extendido",
+    "description": "Nombre de la acción por defecto Resumen extendido"
+  },
+  "actionExtendedSummaryPrompt": {
+    "message": "Por favor, analiza la siguiente transcripción del vídeo de YouTube titulado \"{{titulo}}\" y genera:\n\n1. Un resumen ejecutivo (3-4 frases).\n2. Los 5-7 puntos clave con viñetas explicativas.\n3. Conclusiones o 'takeaways' accionables.\n\nFormatea todo con Markdown claro utilizando encabezados H2 y H3, y negrita para los conceptos importantes.\n\n---\n\nTRANSCRIPCIÓN COMPLETA:\n{{transcripcion}}",
+    "description": "Prompt de la acción por defecto Resumen extendido"
+  },
+  "actionAskVideoName": {
+    "message": "Preguntar al vídeo",
+    "description": "Nombre de la acción por defecto Preguntar al vídeo"
+  },
+  "actionAskVideoPrompt": {
+    "message": "Título del vídeo: \"{{titulo}}\"\n\nTranscripción:\n{{transcripcion}}\n\nConfirma en una sola línea que has leído la transcripción y que estás listo para responder preguntas. No resumas nada todavía ni añadas ninguna otra información.",
+    "description": "Prompt de la acción por defecto Preguntar al vídeo"
+  },
+  "actionDataReferencesName": {
+    "message": "Datos y referencias",
+    "description": "Nombre de la acción por defecto Datos y referencias"
+  },
+  "actionDataReferencesPrompt": {
+    "message": "A partir del vídeo \"{{titulo}}\" y la siguiente transcripción, extrae únicamente la información verificable que se cite explícitamente: cifras y estadísticas, estudios o fuentes, nombres propios, libros, herramientas y enlaces mencionados.\n\nPreséntalo en una lista, indicando claramente si alguna afirmación importante carece de fuente citada en el vídeo. No incluyas opiniones ni resúmenes.\n\nTranscripción:\n{{transcripcion}}",
+    "description": "Prompt de la acción por defecto Datos y referencias"
+  },
+  "actionCopyTranscriptName": {
+    "message": "Copiar transcripción",
+    "description": "Nombre de la acción por defecto Copiar transcripción"
+  },
+  "actionCopyTranscriptPrompt": {
+    "message": "{{transcripcion}}",
+    "description": "Prompt de la acción por defecto Copiar transcripción"
+  },
+  "actionIndexMinutesName": {
+    "message": "Índice con minutos",
+    "description": "Nombre de la acción por defecto Índice con minutos"
+  },
+  "actionIndexMinutesPrompt": {
+    "message": "A continuación tienes la transcripción del vídeo \"{{titulo}}\" con marcas de tiempo. Crea un índice de secciones para el vídeo, indicando el minuto de inicio y una frase de descripción para cada sección. Añade además al final de cada ítem del índice un enlace con este formato exacto para que yo pueda hacer clic y saltar a ese momento del vídeo: {{url}}&t=SEGUNDOSs (sustituyendo SEGUNDOS por los segundos totales, por ejemplo &t=125s).\n\nTranscripción:\n{{transcripcion_con_tiempos}}",
+    "description": "Prompt de la acción por defecto Índice con minutos"
+  }
+}

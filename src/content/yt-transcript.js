@@ -302,7 +302,10 @@
     try {
       // Ensure we are on a valid YouTube video page
       if (!window.location.pathname.includes('/watch') && !window.location.search.includes('v=')) {
-        return { success: false, error: 'Por favor, abre una página de reproductor de video de YouTube (youtube.com/watch?v=...)' };
+        return {
+          success: false,
+          error: chrome.i18n.getMessage('errorOpenYouTubeWatch') || 'Por favor, abre una página de reproductor de video de YouTube (youtube.com/watch?v=...)'
+        };
       }
 
       const captionTracks = (await extractCaptionTracks()) || [];
@@ -320,7 +323,7 @@
       const trackName = (t) =>
         t?.name?.simpleText || t?.name?.runs?.[0]?.text || t?.languageCode || 'Desconocido';
 
-      let rawTitle = document.title || 'Video de YouTube';
+      let rawTitle = document.title || chrome.i18n.getMessage('defaultVideoTitle') || 'Video de YouTube';
       const cleanTitle = rawTitle.replace(/-\s*YouTube$/i, '').trim();
 
       let fullTranscript = '';
@@ -352,12 +355,12 @@
         if (captionTracks.length === 0) {
           return {
             success: false,
-            error: 'No se encontraron subtítulos o transcripción en este video. Es posible que el creador no haya habilitado subtítulos.'
+            error: chrome.i18n.getMessage('errorNoSubtitlesContent') || 'No se encontraron subtítulos o transcripción en este video. Es posible que el creador no haya habilitado subtítulos.'
           };
         }
         return {
           success: false,
-          error: 'El video tiene subtítulos pero YouTube devolvió el contenido vacío. Recarga la página e inténtalo de nuevo.'
+          error: chrome.i18n.getMessage('errorEmptyTranscriptReload') || 'El video tiene subtítulos pero YouTube devolvió el contenido vacío. Recarga la página e inténtalo de nuevo.'
         };
       }
       
@@ -383,7 +386,10 @@
 
     } catch (err) {
       console.error('[yt-transcript] Error extraction:', err);
-      return { success: false, error: err.message || 'Error desconocido al extraer la transcripción.' };
+      return {
+        success: false,
+        error: err.message || chrome.i18n.getMessage('errorUnknownExtraction') || 'Error desconocido al extraer la transcripción.'
+      };
     }
   }
 

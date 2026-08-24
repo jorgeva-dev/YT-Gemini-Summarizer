@@ -1,4 +1,5 @@
 import { getTranscriptForTab } from '../services/youtube-service.js';
+import { applyI18n } from '../lib/i18n.js';
 
 // DOM Elements
 const actionsContainer = document.getElementById('actionsContainer');
@@ -31,6 +32,8 @@ let currentFullPrompt = '';
 
 // Initialize Side Panel
 document.addEventListener('DOMContentLoaded', async () => {
+  applyI18n();
+
   // Limpiar claves obsoletas de storage si existieran
   try {
     await chrome.storage.local.remove(['geminiApiKey', 'selectedModel', 'geminiTabId', 'pendingPrompt']);
@@ -58,10 +61,12 @@ function renderActions() {
   actionsContainer.innerHTML = '';
   
   if (acciones.length === 0) {
+    const noActionsMsg = chrome.i18n.getMessage('noActionsConfigured') || 'No tienes acciones configuradas.';
+    const openConfigMsg = chrome.i18n.getMessage('openConfigLink') || 'Abrir configuración';
     actionsContainer.innerHTML = `
       <div style="text-align:center; padding: 10px; color: var(--text-muted); font-size: 13px;">
-        No tienes acciones configuradas. <br><br>
-        <a href="#" id="linkOptions" style="color: #A855F7; text-decoration: underline;">Abrir configuración</a>
+        ${noActionsMsg} <br><br>
+        <a href="#" id="linkOptions" style="color: #A855F7; text-decoration: underline;">${openConfigMsg}</a>
       </div>
     `;
     document.getElementById('linkOptions').addEventListener('click', (e) => {
@@ -71,13 +76,15 @@ function renderActions() {
     return;
   }
 
+  const fallbackActionName = chrome.i18n.getMessage('fallbackActionName') || 'Acción';
+
   acciones.forEach((acc, index) => {
     const btn = document.createElement('button');
     btn.className = index === 0 ? 'primary-btn' : 'secondary-action-btn';
     
     btn.innerHTML = `
       <span class="btn-icon">${acc.icono || '⚡'}</span>
-      <span class="btn-text">${acc.nombre || 'Acción'}</span>
+      <span class="btn-text">${acc.nombre || fallbackActionName}</span>
     `;
     
     btn.addEventListener('click', () => handleSummarizeClick(acc));
@@ -89,7 +96,7 @@ function renderActions() {
       
       const sub = document.createElement('span');
       sub.className = 'gem-subtext';
-      sub.textContent = 'Destino: Gem';
+      sub.textContent = chrome.i18n.getMessage('gemDestinationSubtext') || 'Destino: Gem';
       wrapper.appendChild(sub);
       
       actionsContainer.appendChild(wrapper);
@@ -130,7 +137,7 @@ function setupEventListeners() {
     navigator.clipboard.writeText(currentFullPrompt).then(() => {
       const span = copyTranscriptBtn.querySelector('span');
       const originalText = span.textContent;
-      span.textContent = '¡Copiado!';
+      span.textContent = chrome.i18n.getMessage('btnCopied') || '¡Copiado!';
       copyTranscriptBtn.style.color = '#22C55E';
       setTimeout(() => {
         span.textContent = originalText;
@@ -145,10 +152,12 @@ function setupEventListeners() {
  */
 async function handleSummarizeClick(action) {
   lastUsedActionId = action.id;
+  const fallbackActionName = chrome.i18n.getMessage('fallbackActionName') || 'Acción';
+  const actionDisplayName = action.nombre || fallbackActionName;
 
   // Validar
   if (action.destino === 'gem' && (!action.gemUrl || !action.gemUrl.trim())) {
-    showError('Configura la URL de tu Gem en las Opciones para usar esta acción.');
+    showError(chrome.i18n.getMessage('errorGemUrlMissing') || 'Configura la URL de tu Gem en las Opciones para usar esta acción.');
     return;
   }
 
@@ -160,12 +169,12 @@ async function handleSummarizeClick(action) {
   const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
   if (!activeTab || !activeTab.url) {
-    showError('No se pudo acceder a la pestaña activa.');
+    showError(chrome.i18n.getMessage('errorActiveTab') || 'No se pudo acceder a la pestaña activa.');
     return;
   }
 
   if (!activeTab.url.includes('youtube.com/watch')) {
-    showError('La pestaña activa no es un reproductor de video de YouTube. Abre un video para usar las acciones.');
+    showError(chrome.i18n.getMessage('errorNotYouTube') || 'La pestaña activa no es un reproductor de video de YouTube. Abre un video para usar las acciones.');
     return;
   }
 
@@ -174,7 +183,7 @@ async function handleSummarizeClick(action) {
   try {
     transcriptResponse = await getTranscriptForTab(activeTab);
   } catch (err) {
-    showError(err.message || 'No se pudo obtener la transcripción del video.');
+    showError(err.message || chrome.i18n.getMessage('errorGetTranscriptFallback') || 'No se pudo obtener la transcripción del video.');
     return;
   }
 
@@ -196,14 +205,15 @@ async function handleSummarizeClick(action) {
 
   // Mostrar datos del video
   videoTitleDisplay.textContent = transcriptResponse.title;
-  metaLang.textContent = `Idioma: ${transcriptResponse.language || 'Auto'}`;
-  metaWords.textContent = `~${transcriptResponse.wordCount || 0} palabras`;
+  const langDisplay = transcriptResponse.language || chrome.i18n.getMessage('langAuto') || 'Auto';
+  metaLang.textContent = chrome.i18n.getMessage('metaLang', [langDisplay]) || `Idioma: ${langDisplay}`;
+  metaWords.textContent = chrome.i18n.getMessage('metaWords', [String(transcriptResponse.wordCount || 0)]) || `~${transcriptResponse.wordCount || 0} palabras`;
 
   // 5. Destino Portapapeles
   if (action.destino === 'portapapeles') {
-    noticeTitle.textContent = `✨ Copiado (${action.nombre})`;
-    document.querySelector('.notice-text').textContent = 'El contenido no se envió a ninguna parte, solo se ha copiado en tu portapapeles.';
-    document.querySelector('.notice-subtext').innerHTML = 'Pégalo donde necesites con <strong>Cmd + V</strong> (o <strong>Ctrl + V</strong>).';
+    noticeTitle.textContent = chrome.i18n.getMessage('noticeCopiedTitle', [actionDisplayName]) || `✨ Copiado (${actionDisplayName})`;
+    document.querySelector('.notice-text').textContent = chrome.i18n.getMessage('noticeCopiedText') || 'El contenido no se envió a ninguna parte, solo se ha copiado en tu portapapeles.';
+    document.querySelector('.notice-subtext').innerHTML = chrome.i18n.getMessage('noticeCopiedSubtext') || 'Pégalo donde necesites con <strong>Cmd + V</strong> (o <strong>Ctrl + V</strong>).';
     showState('success');
     return;
   }
@@ -238,7 +248,7 @@ async function handleSummarizeClick(action) {
       pendingPrompts[newTab.id] = {
         text: fullPrompt,
         title: transcriptResponse.title,
-        mode: action.nombre,
+        mode: actionDisplayName,
         createdAt: now
       };
 
@@ -256,10 +266,10 @@ async function handleSummarizeClick(action) {
 
   // 8. Actualizar texto de estado de éxito (por si window.close se demorase)
   if (noticeTitle) {
-    noticeTitle.textContent = `✨ Enviado a Gemini (${action.nombre})`;
+    noticeTitle.textContent = chrome.i18n.getMessage('noticeSentGeminiActionTitle', [actionDisplayName]) || `✨ Enviado a Gemini (${actionDisplayName})`;
   }
-  document.querySelector('.notice-text').textContent = 'Se ha abierto una nueva pestaña a la derecha en Gemini con el contenido correspondiente.';
-  document.querySelector('.notice-subtext').innerHTML = 'Si el pegado automático fallara, el contenido ya está copiado: sólo pulsa <strong>Cmd + V</strong> (o <strong>Ctrl + V</strong>) en el chat.';
+  document.querySelector('.notice-text').textContent = chrome.i18n.getMessage('noticeSentGeminiText') || 'Se ha abierto una nueva pestaña a la derecha en Gemini con el contenido correspondiente.';
+  document.querySelector('.notice-subtext').innerHTML = chrome.i18n.getMessage('noticeSentGeminiSubtextShort') || 'Si el pegado automático fallara, el contenido ya está copiado: sólo pulsa <strong>Cmd + V</strong> (o <strong>Ctrl + V</strong>) en el chat.';
 
   showState('success');
 }

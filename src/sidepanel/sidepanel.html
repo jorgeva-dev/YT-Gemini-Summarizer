@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>YouTube Gemini Summarizer</title>
+  <title data-i18n="extName">YouTube Gemini Summarizer</title>
   <link rel="stylesheet" href="sidepanel.css">
 </head>
 <body>
@@ -28,14 +28,14 @@
         </div>
       </div>
       <div class="header-actions">
-        <button id="openOptionsBtn" class="icon-btn" title="Configurar Acciones" style="background:none; border:none; cursor:pointer; font-size:18px;">⚙️</button>
+        <button id="openOptionsBtn" class="icon-btn" data-i18n-title="btnConfigureActionsTitle" title="Configurar Acciones" style="background:none; border:none; cursor:pointer; font-size:18px;">⚙️</button>
       </div>
     </header>
 
     <!-- CONTROL PANEL -->
     <section class="control-card">
       <div id="actionsContainer" style="display:flex; flex-direction:column; gap:10px; width:100%;">
-        <div style="text-align:center; padding: 10px; color: var(--text-muted); font-size: 12px;">Cargando acciones...</div>
+        <div data-i18n="loadingActions" style="text-align:center; padding: 10px; color: var(--text-muted); font-size: 12px;">Cargando acciones...</div>
       </div>
     </section>
 
@@ -45,8 +45,8 @@
       <div id="idleState" class="state-view active">
         <div class="placeholder-box">
           <div class="placeholder-icon">📹</div>
-          <h3>Listo para resumir</h3>
-          <p>Navega a un vídeo de YouTube y elige la modalidad de resumen o análisis que prefieras.</p>
+          <h3 data-i18n="idleTitle">Listo para resumir</h3>
+          <p data-i18n="idleDesc">Navega a un vídeo de YouTube y elige la modalidad de resumen o análisis que prefieras.</p>
         </div>
       </div>
 
@@ -54,16 +54,16 @@
       <div id="loadingState" class="state-view">
         <div class="loading-box">
           <div class="spinner"></div>
-          <h3 id="loadingTitle">Procesando Video</h3>
+          <h3 id="loadingTitle" data-i18n="loadingTitle">Procesando Video</h3>
           
           <div class="progress-steps">
             <div id="stepTranscript" class="step-item active">
               <span class="step-icon">📄</span>
-              <span class="step-label">Extrayendo transcripción de YouTube...</span>
+              <span class="step-label" data-i18n="stepExtractingTranscript">Extrayendo transcripción de YouTube...</span>
             </div>
             <div id="stepGemini" class="step-item">
               <span class="step-icon">🚀</span>
-              <span class="step-label">Abriendo Gemini y pegando...</span>
+              <span class="step-label" data-i18n="stepOpeningGemini">Abriendo Gemini y pegando...</span>
             </div>
           </div>
         </div>
@@ -74,26 +74,26 @@
         <div class="summary-header">
           <div class="video-info">
             <span class="badge">YouTube</span>
-            <h2 id="videoTitleDisplay" class="video-title">Título del Video</h2>
+            <h2 id="videoTitleDisplay" class="video-title" data-i18n="defaultVideoTitle">Título del Video</h2>
             <div class="meta-info">
               <span id="metaLang">Idioma: ES</span> • <span id="metaWords">~1200 palabras</span>
             </div>
           </div>
 
           <div class="toolbar">
-            <button id="copyTranscriptBtn" class="tool-btn" title="Copiar transcripción al portapapeles">
+            <button id="copyTranscriptBtn" class="tool-btn" data-i18n-title="btnCopyTranscriptTitle" title="Copiar transcripción al portapapeles">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-              <span>Copiar transcripción</span>
+              <span data-i18n="btnCopyTranscript">Copiar transcripción</span>
             </button>
           </div>
         </div>
 
         <div class="notice-card">
-          <div id="noticeTitle" class="notice-title">✨ Enviado a Gemini Web</div>
-          <p class="notice-text">
+          <div id="noticeTitle" class="notice-title" data-i18n="noticeSentGeminiDefault">✨ Enviado a Gemini Web</div>
+          <p class="notice-text" data-i18n="noticeSentGeminiText">
             Se ha abierto una nueva pestaña a la derecha en Gemini con el contenido correspondiente.
           </p>
-          <div class="notice-subtext">
+          <div class="notice-subtext" data-i18n="noticeSentGeminiSubtext">
             Si el pegado automático fallara en la página, el contenido ya está copiado en tu portapapeles: sólo pulsa <strong>Cmd + V</strong> (o <strong>Ctrl + V</strong>) en el chat.
           </div>
         </div>
@@ -103,11 +103,11 @@
       <div id="errorState" class="state-view">
         <div class="error-box">
           <div class="error-icon">⚠️</div>
-          <h3>Ocurrió un Problema</h3>
-          <p id="errorMessageText">No se pudo procesar la solicitud.</p>
+          <h3 data-i18n="errorTitle">Ocurrió un Problema</h3>
+          <p id="errorMessageText" data-i18n="errorDefaultMessage">No se pudo procesar la solicitud.</p>
           
           <div class="error-actions">
-            <button id="retryBtn" class="secondary-btn">Reintentar</button>
+            <button id="retryBtn" class="secondary-btn" data-i18n="btnRetry">Reintentar</button>
           </div>
         </div>
       </div>
@@ -115,7 +115,7 @@
 
     <!-- FOOTER -->
     <footer class="app-footer">
-      <span>Local-First • Manifest V3</span>
+      <span data-i18n="footerText">Local-First • Manifest V3</span>
     </footer>
   </div>
 

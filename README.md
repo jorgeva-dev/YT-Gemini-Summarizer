@@ -4,7 +4,9 @@ A Chrome/Brave extension that pulls the transcript out of the YouTube video you 
 
 What you do with the transcript is configurable. Ship-with defaults cover short summaries, structured summaries, key figures and references, or just copying the raw transcript to your clipboard. You can add your own actions, including ones that open your own **Gems**.
 
-> The extension UI is in Spanish. Everything below applies regardless; the code and this document are in English.
+![The extension's side panel open beside a YouTube video, listing summary actions](assets/screenshot-youtube.jpg)
+
+Available in English and Spanish — it follows your browser's language.
 
 ---
 
@@ -54,6 +56,8 @@ Templates support four placeholders:
 - `{{url}}` — video URL
 
 Actions are managed from the options page: create, edit, reorder, import and export as JSON. Defaults are seeded on first install and never overwritten afterwards.
+
+![The options page listing the default actions, with buttons to add, import, export and restore them](assets/screenshot-options.png)
 
 ### Using your own Gems
 
