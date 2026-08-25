@@ -2,8 +2,9 @@
 import { getDefaultActions } from '../config/default-actions.js';
 
 chrome.runtime.onInstalled.addListener(async () => {
+  // Desactivar apertura global por ventana para que el panel sea exclusivo por pestaña
   if (chrome.sidePanel && typeof chrome.sidePanel.setPanelBehavior === 'function') {
-    chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true })
+    chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false })
       .catch((error) => console.warn('Side Panel behavior setting not supported:', error));
   }
 
@@ -12,6 +13,16 @@ chrome.runtime.onInstalled.addListener(async () => {
   if (!data.acciones) {
     const defaultActions = getDefaultActions();
     await chrome.storage.local.set({ acciones: defaultActions });
+  }
+});
+
+// Abrir el panel lateral exclusivamente para la pestaña activa donde se hizo clic
+chrome.action.onClicked.addListener(async (tab) => {
+  if (!tab || !tab.id) return;
+  try {
+    await chrome.sidePanel.open({ tabId: tab.id });
+  } catch (error) {
+    console.warn('[service-worker] Error al abrir el panel lateral por pestaña:', error);
   }
 });
 
