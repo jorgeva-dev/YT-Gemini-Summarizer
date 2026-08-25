@@ -94,41 +94,159 @@
         } else {
           editor.textContent = text;
         }
-        editor.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: text }));
-        editor.dispatchEvent(new Event('change', { bubbles: true }));
       }
 
-      await sleep(350);
+      // Notificar siempre al framework (Angular/Lit/ProseMirror) para habilitar el botón de envío
+      const notifyInput = () => {
+        try {
+          editor.dispatchEvent(new InputEvent('input', { bubbles: true, cancelable: true, inputType: 'insertText', data: text }));
+          editor.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+          editor.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
+          const pChild = editor.querySelector('p');
+          if (pChild) {
+            pChild.dispatchEvent(new InputEvent('input', { bubbles: true, cancelable: true, inputType: 'insertText', data: text }));
+            pChild.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+          }
+        } catch (e) { /* ignore */ }
+      };
 
-      // Polling para esperar a que el botón de envío esté habilitado y pulsar
-      const sendBtnSelectors = [
-        'button.send-button',
-        'button[aria-label*="Enviar" i]',
-        'button[aria-label*="Send" i]',
-        'button.send-button-container button',
-        '.input-area-container button[aria-label*="Enviar" i]',
-        '.input-area-container button[aria-label*="Send" i]'
-      ];
+      notifyInput();
+      await sleep(250);
 
-      let sendBtn = null;
-      for (let i = 0; i < 25; i++) {
+      // Helper para buscar el botón de envío (tanto en Gemini estándar como en Gems)
+      function findSendButton() {
+        const sendBtnSelectors = [
+          'button.send-button',
+          'button[aria-label*="Enviar" i]',
+          'button[aria-label*="Send" i]',
+          'button[aria-label*="prompt" i]',
+          'button[aria-label*="Submit" i]',
+          'button[aria-label*="mensaje" i]',
+          'button[aria-label*="message" i]',
+          'button[data-test-id*="send" i]',
+          'button[data-test-id*="submit" i]',
+          '.send-button-container button',
+          '.input-area-container button[aria-label*="Enviar" i]',
+          '.input-area-container button[aria-label*="Send" i]',
+          '.input-area-container button.send-button',
+          'button.speech-to-text-and-send-button',
+          'div[role="button"][aria-label*="Enviar" i]',
+          'div[role="button"][aria-label*="Send" i]',
+          'div[role="button"][aria-label*="prompt" i]'
+        ];
+
         for (const sel of sendBtnSelectors) {
-          const btn = document.querySelector(sel);
-          if (btn && !btn.disabled && btn.getAttribute('aria-disabled') !== 'true') {
-            sendBtn = btn;
-            break;
+          const el = document.querySelector(sel);
+          if (el && (el.offsetWidth > 0 || el.offsetHeight > 0)) {
+            return el;
           }
         }
-        if (sendBtn) break;
+
+        // Búsqueda en el contenedor del editor o barra inferior
+        const container = editor.closest('.input-area-container') ||
+                          editor.closest('.input-area') ||
+                          editor.closest('rich-textarea')?.parentElement ||
+                          document.querySelector('.bottom-container') ||
+                          document.querySelector('footer');
+
+        if (container) {
+          const buttons = container.querySelectorAll('button, div[role="button"]');
+          for (const btn of buttons) {
+            const aria = (btn.getAttribute('aria-label') || '').toLowerCase();
+            const html = btn.innerHTML.toLowerCase();
+            if (
+              aria.includes('send') || aria.includes('enviar') || aria.includes('prompt') ||
+              html.includes('send') || html.includes('send_spark') || html.includes('arrow_upward') ||
+              btn.classList.contains('send-button')
+            ) {
+              return btn;
+            }
+          }
+        }
+
+        return null;
+      }
+
+      function triggerClick(element) {
+        if (!element) return;
+        try {
+          element.removeAttribute('disabled');
+          element.setAttribute('aria-disabled', 'false');
+          element.classList.remove('disabled');
+        } catch (e) {}
+
+        const mouseEvents = ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'];
+        for (const evtName of mouseEvents) {
+          try {
+            const evt = new MouseEvent(evtName, {
+              bubbles: true,
+              cancelable: true,
+              view: window
+            });
+            element.dispatchEvent(evt);
+          } catch (e) {}
+        }
+
+        if (typeof element.click === 'function') {
+          try {
+            element.click();
+          } catch (e) {}
+        }
+      }
+
+      function triggerEnter(target) {
+        if (!target) return;
+        const enterOpts = {
+          key: 'Enter',
+          code: 'Enter',
+          keyCode: 13,
+          which: 13,
+          charCode: 13,
+          bubbles: true,
+          cancelable: true
+        };
+        try {
+          target.dispatchEvent(new KeyboardEvent('keydown', enterOpts));
+          target.dispatchEvent(new KeyboardEvent('keypress', enterOpts));
+          target.dispatchEvent(new KeyboardEvent('keyup', enterOpts));
+        } catch (e) {}
+      }
+
+      // Polling para esperar a que el botón de envío esté presente/habilitado
+      let sendBtn = null;
+      for (let i = 0; i < 35; i++) {
+        sendBtn = findSendButton();
+        if (sendBtn) {
+          const isDisabled = sendBtn.disabled || sendBtn.getAttribute('aria-disabled') === 'true';
+          if (!isDisabled) {
+            break;
+          }
+          // Si sigue deshabilitado, re-notificar input al editor
+          notifyInput();
+        }
         await sleep(200);
       }
 
+      // 1. Intentar hacer click en el botón de envío si se localizó
       if (sendBtn) {
-        sendBtn.click();
-        console.log('[gemini-paste] Transcripción e instrucciones enviadas con éxito a Gemini.');
-      } else {
-        console.warn('[gemini-paste] No se activó el botón de enviar. Puedes pulsar Enter o pegar con Cmd+V.');
+        triggerClick(sendBtn);
+        await sleep(300);
       }
+
+      // 2. Comprobar si aún queda el texto en el editor y enviar pulsación de Enter
+      const currentText = (editor.textContent || editor.value || '').trim();
+      if (currentText.length > 0) {
+        editor.focus();
+        triggerEnter(editor);
+        await sleep(200);
+        
+        // Si hay un botón de envío, volver a forzar el click tras el Enter
+        if (sendBtn) {
+          triggerClick(sendBtn);
+        }
+      }
+
+      console.log('[gemini-paste] Proceso de inserción y auto-envío completado en Gemini/Gem.');
 
     } catch (err) {
       console.error('[gemini-paste] Error no crítico durante el pegado:', err);
