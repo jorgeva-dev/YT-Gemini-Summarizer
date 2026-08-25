@@ -30,10 +30,19 @@ let acciones = [];
 let lastUsedActionId = null;
 let currentFullPrompt = '';
 let isProcessing = false;
+let originTabId = null;
 
 // Initialize Side Panel
 document.addEventListener('DOMContentLoaded', async () => {
   applyI18n();
+
+  // Guardar la pestaña activa original en la que se abrió este panel
+  try {
+    const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (activeTab && activeTab.id) {
+      originTabId = activeTab.id;
+    }
+  } catch (e) { /* noop */ }
 
   // Limpiar claves obsoletas de storage si existieran
   try {
@@ -54,20 +63,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 /**
- * Escucha cambios de pestaña activa y navegación para refrescar el estado del panel.
+ * Escucha cambios de pestaña activa: si el usuario cambia a otra pestaña o abre una nueva,
+ * el panel se cierra automáticamente para garantizar que sea exclusivo de su pestaña.
  */
 function setupTabListeners() {
-  const resetIfInactive = async () => {
-    // Si no estamos en medio de una extracción, resetear vistas de error o éxito al cambiar de pestaña
-    if (!isProcessing) {
-      showState('idle');
-    }
-  };
-
-  chrome.tabs.onActivated.addListener(resetIfInactive);
-  chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
-    if (changeInfo.status === 'complete' || changeInfo.url) {
-      resetIfInactive();
+  chrome.tabs.onActivated.addListener((activeInfo) => {
+    if (originTabId && activeInfo.tabId !== originTabId) {
+      window.close();
     }
   });
 }
