@@ -113,6 +113,33 @@
       notifyInput();
       await sleep(250);
 
+      // Helper para verificar si un botón es el de "Detener / Stop"
+      function isStopButton(btn) {
+        if (!btn) return false;
+        const aria = (btn.getAttribute('aria-label') || '').toLowerCase();
+        const html = btn.innerHTML.toLowerCase();
+        return aria.includes('stop') || aria.includes('detener') || aria.includes('parar') ||
+               aria.includes('cancel') || html.includes('stop') || btn.classList.contains('stop-button');
+      }
+
+      // Helper para comprobar si Gemini ya ha comenzado a generar la respuesta
+      function isGenerating() {
+        const stopSelectors = [
+          'button[aria-label*="Stop" i]',
+          'button[aria-label*="Detener" i]',
+          'button[aria-label*="Parar" i]',
+          'button.stop-button',
+          '.stop-icon',
+          'mat-icon[fonticon="stop"]',
+          'mat-icon[data-mat-icon-name="stop"]'
+        ];
+        for (const sel of stopSelectors) {
+          const el = document.querySelector(sel);
+          if (el && (el.offsetWidth > 0 || el.offsetHeight > 0)) return true;
+        }
+        return false;
+      }
+
       // Helper para buscar el botón de envío (tanto en Gemini estándar como en Gems)
       function findSendButton() {
         const sendBtnSelectors = [
@@ -137,7 +164,7 @@
 
         for (const sel of sendBtnSelectors) {
           const el = document.querySelector(sel);
-          if (el && (el.offsetWidth > 0 || el.offsetHeight > 0)) {
+          if (el && (el.offsetWidth > 0 || el.offsetHeight > 0) && !isStopButton(el)) {
             return el;
           }
         }
@@ -152,6 +179,7 @@
         if (container) {
           const buttons = container.querySelectorAll('button, div[role="button"]');
           for (const btn of buttons) {
+            if (isStopButton(btn)) continue;
             const aria = (btn.getAttribute('aria-label') || '').toLowerCase();
             const html = btn.innerHTML.toLowerCase();
             if (
@@ -168,7 +196,7 @@
       }
 
       function triggerClick(element) {
-        if (!element) return;
+        if (!element || isStopButton(element) || isGenerating()) return;
         try {
           element.removeAttribute('disabled');
           element.setAttribute('aria-disabled', 'false');
@@ -177,6 +205,7 @@
 
         const mouseEvents = ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'];
         for (const evtName of mouseEvents) {
+          if (isStopButton(element) || isGenerating()) return;
           try {
             const evt = new MouseEvent(evtName, {
               bubbles: true,
@@ -187,7 +216,7 @@
           } catch (e) {}
         }
 
-        if (typeof element.click === 'function') {
+        if (typeof element.click === 'function' && !isStopButton(element) && !isGenerating()) {
           try {
             element.click();
           } catch (e) {}
@@ -195,7 +224,7 @@
       }
 
       function triggerEnter(target) {
-        if (!target) return;
+        if (!target || isGenerating()) return;
         const enterOpts = {
           key: 'Enter',
           code: 'Enter',
@@ -215,8 +244,13 @@
       // Polling para esperar a que el botón de envío esté presente/habilitado
       let sendBtn = null;
       for (let i = 0; i < 35; i++) {
+        if (isGenerating()) {
+          console.log('[gemini-paste] Generación ya iniciada detectada.');
+          return;
+        }
+
         sendBtn = findSendButton();
-        if (sendBtn) {
+        if (sendBtn && !isStopButton(sendBtn)) {
           const isDisabled = sendBtn.disabled || sendBtn.getAttribute('aria-disabled') === 'true';
           if (!isDisabled) {
             break;
@@ -227,26 +261,40 @@
         await sleep(200);
       }
 
+      if (isGenerating()) {
+        console.log('[gemini-paste] Generación en curso, finalizando script.');
+        return;
+      }
+
       // 1. Intentar hacer click en el botón de envío si se localizó
-      if (sendBtn) {
+      if (sendBtn && !isStopButton(sendBtn)) {
         triggerClick(sendBtn);
-        await sleep(300);
+        await sleep(400);
       }
 
-      // 2. Comprobar si aún queda el texto en el editor y enviar pulsación de Enter
-      const currentText = (editor.textContent || editor.value || '').trim();
-      if (currentText.length > 0) {
-        editor.focus();
-        triggerEnter(editor);
-        await sleep(200);
-        
-        // Si hay un botón de envío, volver a forzar el click tras el Enter
-        if (sendBtn) {
-          triggerClick(sendBtn);
-        }
+      // Si la generación ya arrancó, terminar inmediatamente para evitar detenerla
+      if (isGenerating()) {
+        console.log('[gemini-paste] Envío iniciado con éxito tras click.');
+        return;
       }
 
-      console.log('[gemini-paste] Proceso de inserción y auto-envío completado en Gemini/Gem.');
+      // 2. Si todavía no ha empezado a generar, enviar pulsación de Enter
+      editor.focus();
+      triggerEnter(editor);
+      await sleep(400);
+
+      if (isGenerating()) {
+        console.log('[gemini-paste] Envío iniciado con éxito tras Enter.');
+        return;
+      }
+
+      // 3. Como último recurso, buscar de nuevo el botón y hacer clic si sigue inactivo
+      const freshBtn = findSendButton();
+      if (freshBtn && !isStopButton(freshBtn) && !isGenerating()) {
+        triggerClick(freshBtn);
+      }
+
+      console.log('[gemini-paste] Proceso de inserción completado.');
 
     } catch (err) {
       console.error('[gemini-paste] Error no crítico durante el pegado:', err);
