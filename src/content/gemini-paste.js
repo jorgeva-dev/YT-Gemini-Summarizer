@@ -6,11 +6,14 @@
  */
 
 (function () {
+  // Evitar ejecuciones duplicadas del script en la misma pestaña
+  if (window.__ytGeminiPasteExecuted) return;
+  window.__ytGeminiPasteExecuted = true;
+
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   /**
    * Inyecta estilos opcionales para ocultar la barra lateral de navegación de Gemini.
-   * Nota: Estos selectores corresponden al DOM de Google y podrían cambiar con el tiempo.
    */
   function injectOptionalFocusStyles() {
     try {
@@ -96,7 +99,7 @@
         }
       }
 
-      // Notificar siempre al framework (Angular/Lit/ProseMirror) para habilitar el botón de envío
+      // Notificar al framework (Angular/Lit/ProseMirror) para habilitar el botón de envío
       const notifyInput = () => {
         try {
           editor.dispatchEvent(new InputEvent('input', { bubbles: true, cancelable: true, inputType: 'insertText', data: text }));
@@ -140,62 +143,52 @@
         return false;
       }
 
-      // Helper para buscar el botón de envío (tanto en Gemini estándar como en Gems)
+      // Helper para buscar el botón de envío específico del área de chat
       function findSendButton() {
+        const inputContainer = editor.closest('.input-area-container') ||
+                              editor.closest('.input-area') ||
+                              editor.closest('rich-textarea')?.parentElement ||
+                              editor.closest('chat-window') ||
+                              document.querySelector('.bottom-container') ||
+                              document.querySelector('footer') ||
+                              document;
+
         const sendBtnSelectors = [
           'button.send-button',
           'button[aria-label*="Enviar" i]',
           'button[aria-label*="Send" i]',
-          'button[aria-label*="prompt" i]',
-          'button[aria-label*="Submit" i]',
-          'button[aria-label*="mensaje" i]',
-          'button[aria-label*="message" i]',
           'button[data-test-id*="send" i]',
           'button[data-test-id*="submit" i]',
           '.send-button-container button',
-          '.input-area-container button[aria-label*="Enviar" i]',
-          '.input-area-container button[aria-label*="Send" i]',
-          '.input-area-container button.send-button',
-          'button.speech-to-text-and-send-button',
-          'div[role="button"][aria-label*="Enviar" i]',
-          'div[role="button"][aria-label*="Send" i]',
-          'div[role="button"][aria-label*="prompt" i]'
+          'button.speech-to-text-and-send-button'
         ];
 
         for (const sel of sendBtnSelectors) {
-          const el = document.querySelector(sel);
+          const el = inputContainer.querySelector(sel);
           if (el && (el.offsetWidth > 0 || el.offsetHeight > 0) && !isStopButton(el)) {
             return el;
           }
         }
 
-        // Búsqueda en el contenedor del editor o barra inferior
-        const container = editor.closest('.input-area-container') ||
-                          editor.closest('.input-area') ||
-                          editor.closest('rich-textarea')?.parentElement ||
-                          document.querySelector('.bottom-container') ||
-                          document.querySelector('footer');
-
-        if (container) {
-          const buttons = container.querySelectorAll('button, div[role="button"]');
-          for (const btn of buttons) {
-            if (isStopButton(btn)) continue;
-            const aria = (btn.getAttribute('aria-label') || '').toLowerCase();
-            const html = btn.innerHTML.toLowerCase();
-            if (
-              aria.includes('send') || aria.includes('enviar') || aria.includes('prompt') ||
-              html.includes('send') || html.includes('send_spark') || html.includes('arrow_upward') ||
-              btn.classList.contains('send-button')
-            ) {
-              return btn;
-            }
+        // Búsqueda por contenido/iconos dentro del contenedor del input
+        const buttons = inputContainer.querySelectorAll('button, div[role="button"]');
+        for (const btn of buttons) {
+          if (isStopButton(btn)) continue;
+          const aria = (btn.getAttribute('aria-label') || '').toLowerCase();
+          const html = btn.innerHTML.toLowerCase();
+          if (
+            aria.includes('send') || aria.includes('enviar') ||
+            html.includes('send') || html.includes('send_spark') || html.includes('arrow_upward') ||
+            btn.classList.contains('send-button')
+          ) {
+            return btn;
           }
         }
 
         return null;
       }
 
-      function triggerClick(element) {
+      function clickButton(element) {
         if (!element || isStopButton(element) || isGenerating()) return;
         try {
           element.removeAttribute('disabled');
@@ -203,23 +196,10 @@
           element.classList.remove('disabled');
         } catch (e) {}
 
-        const mouseEvents = ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'];
-        for (const evtName of mouseEvents) {
-          if (isStopButton(element) || isGenerating()) return;
-          try {
-            const evt = new MouseEvent(evtName, {
-              bubbles: true,
-              cancelable: true,
-              view: window
-            });
-            element.dispatchEvent(evt);
-          } catch (e) {}
-        }
-
-        if (typeof element.click === 'function' && !isStopButton(element) && !isGenerating()) {
-          try {
-            element.click();
-          } catch (e) {}
+        try {
+          element.click();
+        } catch (e) {
+          console.warn('[gemini-paste] Error al hacer clic en el botón:', e);
         }
       }
 
@@ -236,12 +216,10 @@
         };
         try {
           target.dispatchEvent(new KeyboardEvent('keydown', enterOpts));
-          target.dispatchEvent(new KeyboardEvent('keypress', enterOpts));
-          target.dispatchEvent(new KeyboardEvent('keyup', enterOpts));
         } catch (e) {}
       }
 
-      // Polling para esperar a que el botón de envío esté presente/habilitado
+      // Polling para esperar a que el botón de envío esté presente y habilitado
       let sendBtn = null;
       for (let i = 0; i < 35; i++) {
         if (isGenerating()) {
@@ -266,35 +244,17 @@
         return;
       }
 
-      // 1. Intentar hacer click en el botón de envío si se localizó
+      // Envío estricto de una única vez
       if (sendBtn && !isStopButton(sendBtn)) {
-        triggerClick(sendBtn);
-        await sleep(400);
-      }
-
-      // Si la generación ya arrancó, terminar inmediatamente para evitar detenerla
-      if (isGenerating()) {
-        console.log('[gemini-paste] Envío iniciado con éxito tras click.');
+        clickButton(sendBtn);
+        console.log('[gemini-paste] Envío realizado con éxito mediante clic único.');
         return;
       }
 
-      // 2. Si todavía no ha empezado a generar, enviar pulsación de Enter
+      // Como fallback si no se localizó botón activo, disparar Enter una sola vez
       editor.focus();
       triggerEnter(editor);
-      await sleep(400);
-
-      if (isGenerating()) {
-        console.log('[gemini-paste] Envío iniciado con éxito tras Enter.');
-        return;
-      }
-
-      // 3. Como último recurso, buscar de nuevo el botón y hacer clic si sigue inactivo
-      const freshBtn = findSendButton();
-      if (freshBtn && !isStopButton(freshBtn) && !isGenerating()) {
-        triggerClick(freshBtn);
-      }
-
-      console.log('[gemini-paste] Proceso de inserción completado.');
+      console.log('[gemini-paste] Envío realizado mediante pulsación de Enter.');
 
     } catch (err) {
       console.error('[gemini-paste] Error no crítico durante el pegado:', err);
