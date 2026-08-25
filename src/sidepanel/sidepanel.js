@@ -29,6 +29,7 @@ const retryBtn = document.getElementById('retryBtn');
 let acciones = [];
 let lastUsedActionId = null;
 let currentFullPrompt = '';
+let isProcessing = false;
 
 // Initialize Side Panel
 document.addEventListener('DOMContentLoaded', async () => {
@@ -41,6 +42,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   await loadActions();
   setupEventListeners();
+  setupTabListeners();
 
   // Escuchar cambios de storage (si editan desde opciones con el panel abierto)
   chrome.storage.onChanged.addListener((changes, namespace) => {
@@ -50,6 +52,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 });
+
+/**
+ * Escucha cambios de pestaña activa y navegación para refrescar el estado del panel.
+ */
+function setupTabListeners() {
+  const resetIfInactive = async () => {
+    // Si no estamos en medio de una extracción, resetear vistas de error o éxito al cambiar de pestaña
+    if (!isProcessing) {
+      showState('idle');
+    }
+  };
+
+  chrome.tabs.onActivated.addListener(resetIfInactive);
+  chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+    if (changeInfo.status === 'complete' || changeInfo.url) {
+      resetIfInactive();
+    }
+  });
+}
 
 async function loadActions() {
   const data = await chrome.storage.local.get('acciones');
@@ -151,127 +172,138 @@ function setupEventListeners() {
  * Manejador principal de extracción y envío dinámico.
  */
 async function handleSummarizeClick(action) {
-  lastUsedActionId = action.id;
-  const fallbackActionName = chrome.i18n.getMessage('fallbackActionName') || 'Acción';
-  const actionDisplayName = action.nombre || fallbackActionName;
-
-  // Validar
-  if (action.destino === 'gem' && (!action.gemUrl || !action.gemUrl.trim())) {
-    showError(chrome.i18n.getMessage('errorGemUrlMissing') || 'Configura la URL de tu Gem en las Opciones para usar esta acción.');
-    return;
-  }
-
-  // 1. Query Active Tab (YouTube)
-  showState('loading');
-  stepTranscript.classList.add('active');
-  stepGemini.classList.remove('active');
-
-  const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
-
-  if (!activeTab || !activeTab.url) {
-    showError(chrome.i18n.getMessage('errorActiveTab') || 'No se pudo acceder a la pestaña activa.');
-    return;
-  }
-
-  if (!activeTab.url.includes('youtube.com/watch')) {
-    showError(chrome.i18n.getMessage('errorNotYouTube') || 'La pestaña activa no es un reproductor de video de YouTube. Abre un video para usar las acciones.');
-    return;
-  }
-
-  // 2. Extraer transcripción usando la ruta única de youtube-service
-  let transcriptResponse = null;
-  try {
-    transcriptResponse = await getTranscriptForTab(activeTab);
-  } catch (err) {
-    showError(err.message || chrome.i18n.getMessage('errorGetTranscriptFallback') || 'No se pudo obtener la transcripción del video.');
-    return;
-  }
-
-  // 3. Sustituir placeholders
-  let fullPrompt = action.prompt || '';
-  fullPrompt = fullPrompt.replace(/\{\{titulo\}\}/g, transcriptResponse.title || '');
-  fullPrompt = fullPrompt.replace(/\{\{transcripcion\}\}/g, transcriptResponse.transcript || '');
-  fullPrompt = fullPrompt.replace(/\{\{url\}\}/g, activeTab.url || '');
-  fullPrompt = fullPrompt.replace(/\{\{transcripcion_con_tiempos\}\}/g, transcriptResponse.transcriptWithTimes || transcriptResponse.transcript || '');
-
-  currentFullPrompt = fullPrompt;
-
-  // 4. Copiar prompt completo al portapapeles
-  try {
-    await navigator.clipboard.writeText(fullPrompt);
-  } catch (e) {
-    console.warn('[sidepanel] Error al copiar al portapapeles:', e);
-  }
-
-  // Mostrar datos del video
-  videoTitleDisplay.textContent = transcriptResponse.title;
-  const langDisplay = transcriptResponse.language || chrome.i18n.getMessage('langAuto') || 'Auto';
-  metaLang.textContent = chrome.i18n.getMessage('metaLang', [langDisplay]) || `Idioma: ${langDisplay}`;
-  metaWords.textContent = chrome.i18n.getMessage('metaWords', [String(transcriptResponse.wordCount || 0)]) || `~${transcriptResponse.wordCount || 0} palabras`;
-
-  // 5. Destino Portapapeles
-  if (action.destino === 'portapapeles') {
-    noticeTitle.textContent = chrome.i18n.getMessage('noticeCopiedTitle', [actionDisplayName]) || `✨ Copiado (${actionDisplayName})`;
-    document.querySelector('.notice-text').textContent = chrome.i18n.getMessage('noticeCopiedText') || 'El contenido no se envió a ninguna parte, solo se ha copiado en tu portapapeles.';
-    document.querySelector('.notice-subtext').innerHTML = chrome.i18n.getMessage('noticeCopiedSubtext') || 'Pégalo donde necesites con <strong>Cmd + V</strong> (o <strong>Ctrl + V</strong>).';
-    showState('success');
-    return;
-  }
-
-  // 6. Actualizar pasos de carga
-  stepTranscript.classList.remove('active');
-  stepGemini.classList.add('active');
-
-  // 7. Abrir pestaña de Gemini y registrar el prompt asociado a su tabId
-  const targetUrl = action.destino === 'gem' ? action.gemUrl.trim() : 'https://gemini.google.com/app';
+  if (isProcessing) return;
+  isProcessing = true;
 
   try {
-    const newTab = await chrome.tabs.create({
-      windowId: activeTab.windowId,
-      index: activeTab.index + 1,
-      url: targetUrl,
-      active: true
-    });
+    lastUsedActionId = action.id;
+    const fallbackActionName = chrome.i18n.getMessage('fallbackActionName') || 'Acción';
+    const actionDisplayName = action.nombre || fallbackActionName;
 
-    if (newTab && newTab.id) {
-      const storageData = await chrome.storage.local.get('pendingPrompts');
-      const pendingPrompts = storageData.pendingPrompts || {};
-
-      // Purgar prompts antiguos (> 2 minutos)
-      const now = Date.now();
-      for (const id of Object.keys(pendingPrompts)) {
-        if (!pendingPrompts[id]?.createdAt || now - pendingPrompts[id].createdAt > 2 * 60 * 1000) {
-          delete pendingPrompts[id];
-        }
-      }
-
-      pendingPrompts[newTab.id] = {
-        text: fullPrompt,
-        title: transcriptResponse.title,
-        mode: actionDisplayName,
-        createdAt: now
-      };
-
-      await chrome.storage.local.set({ pendingPrompts });
+    // Validar URL de Gem
+    if (action.destino === 'gem' && (!action.gemUrl || !action.gemUrl.trim())) {
+      showError(chrome.i18n.getMessage('errorGemUrlMissing') || 'Configura la URL de tu Gem en las Opciones para usar esta acción.');
+      return;
     }
 
-    // Cerrar el side panel lateral
-    setTimeout(() => {
-      window.close();
-    }, 100);
+    // 1. Query Active Tab (YouTube)
+    showState('loading');
+    stepTranscript.classList.add('active');
+    stepGemini.classList.remove('active');
 
-  } catch (e) {
-    console.error('[sidepanel] Error al abrir pestaña de Gemini:', e);
+    const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+
+    if (!activeTab || !activeTab.url) {
+      showError(chrome.i18n.getMessage('errorActiveTab') || 'No se pudo acceder a la pestaña activa.');
+      return;
+    }
+
+    if (!activeTab.url.includes('youtube.com/watch') && !activeTab.url.includes('youtube.com/shorts/')) {
+      showError(chrome.i18n.getMessage('errorNotYouTube') || 'La pestaña activa no es un reproductor de video de YouTube. Abre un video para usar las acciones.');
+      return;
+    }
+
+    // 2. Extraer transcripción con salvaguarda de timeout (15s)
+    let transcriptResponse = null;
+    try {
+      const extractionPromise = getTranscriptForTab(activeTab);
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error(chrome.i18n.getMessage('errorGetTranscriptFallback') || 'Tiempo de espera agotado al obtener la transcripción.')), 15000)
+      );
+      transcriptResponse = await Promise.race([extractionPromise, timeoutPromise]);
+    } catch (err) {
+      showError(err.message || chrome.i18n.getMessage('errorGetTranscriptFallback') || 'No se pudo obtener la transcripción del video.');
+      return;
+    }
+
+    // 3. Sustituir placeholders
+    let fullPrompt = action.prompt || '';
+    fullPrompt = fullPrompt.replace(/\{\{titulo\}\}/g, transcriptResponse.title || '');
+    fullPrompt = fullPrompt.replace(/\{\{transcripcion\}\}/g, transcriptResponse.transcript || '');
+    fullPrompt = fullPrompt.replace(/\{\{url\}\}/g, activeTab.url || '');
+    fullPrompt = fullPrompt.replace(/\{\{transcripcion_con_tiempos\}\}/g, transcriptResponse.transcriptWithTimes || transcriptResponse.transcript || '');
+
+    currentFullPrompt = fullPrompt;
+
+    // 4. Copiar prompt completo al portapapeles
+    try {
+      await navigator.clipboard.writeText(fullPrompt);
+    } catch (e) {
+      console.warn('[sidepanel] Error al copiar al portapapeles:', e);
+    }
+
+    // Mostrar datos del video
+    videoTitleDisplay.textContent = transcriptResponse.title;
+    const langDisplay = transcriptResponse.language || chrome.i18n.getMessage('langAuto') || 'Auto';
+    metaLang.textContent = chrome.i18n.getMessage('metaLang', [langDisplay]) || `Idioma: ${langDisplay}`;
+    metaWords.textContent = chrome.i18n.getMessage('metaWords', [String(transcriptResponse.wordCount || 0)]) || `~${transcriptResponse.wordCount || 0} palabras`;
+
+    // 5. Destino Portapapeles
+    if (action.destino === 'portapapeles') {
+      noticeTitle.textContent = chrome.i18n.getMessage('noticeCopiedTitle', [actionDisplayName]) || `✨ Copiado (${actionDisplayName})`;
+      document.querySelector('.notice-text').textContent = chrome.i18n.getMessage('noticeCopiedText') || 'El contenido no se envió a ninguna parte, solo se ha copiado en tu portapapeles.';
+      document.querySelector('.notice-subtext').innerHTML = chrome.i18n.getMessage('noticeCopiedSubtext') || 'Pégalo donde necesites con <strong>Cmd + V</strong> (o <strong>Ctrl + V</strong>).';
+      showState('success');
+      return;
+    }
+
+    // 6. Actualizar pasos de carga
+    stepTranscript.classList.remove('active');
+    stepGemini.classList.add('active');
+
+    // 7. Abrir pestaña de Gemini y registrar el prompt asociado a su tabId
+    const targetUrl = action.destino === 'gem' ? action.gemUrl.trim() : 'https://gemini.google.com/app';
+
+    try {
+      const newTab = await chrome.tabs.create({
+        windowId: activeTab.windowId,
+        index: activeTab.index + 1,
+        url: targetUrl,
+        active: true
+      });
+
+      if (newTab && newTab.id) {
+        const storageData = await chrome.storage.local.get('pendingPrompts');
+        const pendingPrompts = storageData.pendingPrompts || {};
+
+        // Purgar prompts antiguos (> 2 minutos)
+        const now = Date.now();
+        for (const id of Object.keys(pendingPrompts)) {
+          if (!pendingPrompts[id]?.createdAt || now - pendingPrompts[id].createdAt > 2 * 60 * 1000) {
+            delete pendingPrompts[id];
+          }
+        }
+
+        pendingPrompts[newTab.id] = {
+          text: fullPrompt,
+          title: transcriptResponse.title,
+          mode: actionDisplayName,
+          createdAt: now
+        };
+
+        await chrome.storage.local.set({ pendingPrompts });
+      }
+
+      // Cerrar el side panel lateral
+      setTimeout(() => {
+        window.close();
+      }, 100);
+
+    } catch (e) {
+      console.error('[sidepanel] Error al abrir pestaña de Gemini:', e);
+    }
+
+    // 8. Actualizar texto de estado de éxito (por si window.close se demorase)
+    if (noticeTitle) {
+      noticeTitle.textContent = chrome.i18n.getMessage('noticeSentGeminiActionTitle', [actionDisplayName]) || `✨ Enviado a Gemini (${actionDisplayName})`;
+    }
+    document.querySelector('.notice-text').textContent = chrome.i18n.getMessage('noticeSentGeminiText') || 'Se ha abierto una nueva pestaña a la derecha en Gemini con el contenido correspondiente.';
+    document.querySelector('.notice-subtext').innerHTML = chrome.i18n.getMessage('noticeSentGeminiSubtextShort') || 'Si el pegado automático fallara, el contenido ya está copiado: sólo pulsa <strong>Cmd + V</strong> (o <strong>Ctrl + V</strong>) en el chat.';
+
+    showState('success');
+  } finally {
+    isProcessing = false;
   }
-
-  // 8. Actualizar texto de estado de éxito (por si window.close se demorase)
-  if (noticeTitle) {
-    noticeTitle.textContent = chrome.i18n.getMessage('noticeSentGeminiActionTitle', [actionDisplayName]) || `✨ Enviado a Gemini (${actionDisplayName})`;
-  }
-  document.querySelector('.notice-text').textContent = chrome.i18n.getMessage('noticeSentGeminiText') || 'Se ha abierto una nueva pestaña a la derecha en Gemini con el contenido correspondiente.';
-  document.querySelector('.notice-subtext').innerHTML = chrome.i18n.getMessage('noticeSentGeminiSubtextShort') || 'Si el pegado automático fallara, el contenido ya está copiado: sólo pulsa <strong>Cmd + V</strong> (o <strong>Ctrl + V</strong>) en el chat.';
-
-  showState('success');
 }
 
 // Display Error UI State
