@@ -1,11 +1,21 @@
 // Background Service Worker (Manifest V3)
 import { getDefaultActions } from '../config/default-actions.js';
 
+// Desactivar el panel lateral por defecto a nivel global (todas las pestañas)
+if (chrome.sidePanel && typeof chrome.sidePanel.setOptions === 'function') {
+  chrome.sidePanel.setOptions({ enabled: false }).catch(() => {});
+}
+
 chrome.runtime.onInstalled.addListener(async () => {
   // Desactivar apertura global por ventana para que el panel sea exclusivo por pestaña
-  if (chrome.sidePanel && typeof chrome.sidePanel.setPanelBehavior === 'function') {
-    chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false })
-      .catch((error) => console.warn('Side Panel behavior setting not supported:', error));
+  if (chrome.sidePanel) {
+    if (typeof chrome.sidePanel.setPanelBehavior === 'function') {
+      chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false })
+        .catch((error) => console.warn('Side Panel behavior setting not supported:', error));
+    }
+    if (typeof chrome.sidePanel.setOptions === 'function') {
+      chrome.sidePanel.setOptions({ enabled: false }).catch(() => {});
+    }
   }
 
   // Siembra de acciones por defecto (sólo si no existen)
@@ -20,6 +30,11 @@ chrome.runtime.onInstalled.addListener(async () => {
 chrome.action.onClicked.addListener(async (tab) => {
   if (!tab || !tab.id) return;
   try {
+    await chrome.sidePanel.setOptions({
+      tabId: tab.id,
+      path: 'src/sidepanel/sidepanel.html',
+      enabled: true
+    });
     await chrome.sidePanel.open({ tabId: tab.id });
   } catch (error) {
     console.warn('[service-worker] Error al abrir el panel lateral por pestaña:', error);
