@@ -388,8 +388,12 @@
     "description": "Prompt de la acción por defecto Datos y referencias"
   },
   "actionCopyTranscriptName": {
-    "message": "Copy transcript",
+    "message": "Copy to clipboard",
     "description": "Nombre de la acción por defecto Copiar transcripción"
+  },
+  "errorClipboard": {
+    "message": "Could not copy to the clipboard. Click the panel to give it focus and try again.",
+    "description": "Error mostrado cuando falla la escritura en el portapapeles"
   },
   "actionCopyTranscriptPrompt": {
     "message": "{{transcripcion}}",

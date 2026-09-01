@@ -227,9 +227,13 @@ async function handleSummarizeClick(action) {
 
     currentFullPrompt = fullPrompt;
 
-    // 4. Copiar prompt completo al portapapeles
+    // 4. Copiar prompt completo al portapapeles.
+    // Se espera a que la escritura termine de verdad: si falla, no se puede
+    // anunciar "copiado" porque el portapapeles seguiría con el contenido viejo.
+    let copiadoOk = false;
     try {
       await navigator.clipboard.writeText(fullPrompt);
+      copiadoOk = true;
     } catch (e) {
       console.warn('[sidepanel] Error al copiar al portapapeles:', e);
     }
@@ -240,8 +244,13 @@ async function handleSummarizeClick(action) {
     metaLang.textContent = chrome.i18n.getMessage('metaLang', [langDisplay]) || `Idioma: ${langDisplay}`;
     metaWords.textContent = chrome.i18n.getMessage('metaWords', [String(transcriptResponse.wordCount || 0)]) || `~${transcriptResponse.wordCount || 0} palabras`;
 
-    // 5. Destino Portapapeles
+    // 5. Destino Portapapeles: no abre ninguna pestaña, la transcripción se
+    // queda en el portapapeles y nada más.
     if (action.destino === 'portapapeles') {
+      if (!copiadoOk) {
+        showError(chrome.i18n.getMessage('errorClipboard') || 'No se pudo copiar al portapapeles. Haz clic en el panel para darle el foco y vuelve a intentarlo.');
+        return;
+      }
       noticeTitle.textContent = chrome.i18n.getMessage('noticeCopiedTitle', [actionDisplayName]) || `✨ Copiado (${actionDisplayName})`;
       document.querySelector('.notice-text').textContent = chrome.i18n.getMessage('noticeCopiedText') || 'El contenido no se envió a ninguna parte, solo se ha copiado en tu portapapeles.';
       document.querySelector('.notice-subtext').innerHTML = chrome.i18n.getMessage('noticeCopiedSubtext') || 'Pégalo donde necesites con <strong>Cmd + V</strong> (o <strong>Ctrl + V</strong>).';

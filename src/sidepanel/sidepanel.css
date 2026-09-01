@@ -376,15 +376,20 @@ body {
   gap: 4px;
 }
 
+/* Neutra a propósito. Antes usaba un rojo casi idéntico a --status-red, el de
+   los errores, y al aparecer de golpe daba la impresión de que algo había
+   fallado. Es una etiqueta de origen, no un aviso. */
 .badge {
   align-self: flex-start;
   font-size: 9px;
   font-weight: 700;
-  background: rgba(255, 0, 0, 0.2);
-  color: #FF4D4D;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
   padding: 2px 6px;
   border-radius: 4px;
   text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .video-title {

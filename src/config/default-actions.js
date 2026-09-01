@@ -34,7 +34,7 @@ export function getDefaultActions() {
     },
     {
       id: crypto.randomUUID(),
-      nombre: chrome.i18n.getMessage('actionCopyTranscriptName') || 'Copiar transcripción',
+      nombre: chrome.i18n.getMessage('actionCopyTranscriptName') || 'Copiar a portapapeles',
       icono: '📄',
       destino: 'portapapeles',
       prompt: chrome.i18n.getMessage('actionCopyTranscriptPrompt') || '{{transcripcion}}'
