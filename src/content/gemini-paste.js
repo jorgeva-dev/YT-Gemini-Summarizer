@@ -170,17 +170,25 @@
           }
         }
 
-        // Búsqueda por contenido/iconos dentro del contenedor del input
+        // Búsqueda por contenido/iconos dentro del contenedor del input.
+        //
+        // Antes bastaba con que el HTML interno del botón contuviera "send" en
+        // cualquier parte, lo que podía casar con el botón "+" de adjuntar. Al
+        // pulsarlo se abría su menú (Calendar, Keep, Tasks, Drive...) en vez de
+        // enviar. Ahora la etiqueta accesible manda, y los botones de menú
+        // quedan excluidos explícitamente.
         const buttons = inputContainer.querySelectorAll('button, div[role="button"]');
         for (const btn of buttons) {
-          if (isStopButton(btn)) continue;
+          if (isStopButton(btn) || isMenuButton(btn)) continue;
           const aria = (btn.getAttribute('aria-label') || '').toLowerCase();
-          const html = btn.innerHTML.toLowerCase();
-          if (
-            aria.includes('send') || aria.includes('enviar') ||
-            html.includes('send') || html.includes('send_spark') || html.includes('arrow_upward') ||
-            btn.classList.contains('send-button')
-          ) {
+
+          if (aria.includes('send') || aria.includes('enviar')) return btn;
+          if (btn.classList.contains('send-button')) return btn;
+
+          // Los iconos sólo se admiten si son inequívocos y el botón no tiene
+          // etiqueta que lo desmienta.
+          const icono = (btn.textContent || '').trim().toLowerCase();
+          if (!aria && (icono === 'send' || icono === 'send_spark' || icono === 'arrow_upward')) {
             return btn;
           }
         }
@@ -188,13 +196,38 @@
         return null;
       }
 
+      /**
+       * ¿Es un botón de menú, adjuntar o herramientas? Pulsarlos abre paneles
+       * en vez de enviar, y al usuario le parece que la extensión ha hecho algo
+       * raro.
+       */
+      function isMenuButton(el) {
+        if (!el) return false;
+        const aria = (el.getAttribute('aria-label') || '').toLowerCase();
+        const test = (el.getAttribute('data-test-id') || '').toLowerCase();
+        const patrones = [
+          'add', 'añad', 'anad', 'adjunt', 'attach', 'upload', 'subir',
+          'menu', 'menú', 'more', 'más', 'mas opciones', 'tool', 'herramient',
+          'file', 'archivo', 'imagen', 'image', 'mic', 'micr', 'voice', 'voz'
+        ];
+        return patrones.some((p) => aria.includes(p) || test.includes(p));
+      }
+
       function clickButton(element) {
         if (!element || isStopButton(element) || isGenerating()) return;
-        try {
-          element.removeAttribute('disabled');
-          element.setAttribute('aria-disabled', 'false');
-          element.classList.remove('disabled');
-        } catch (e) {}
+        // Sólo se fuerza la habilitación de algo que sí parece el botón de
+        // enviar: quitarle el disabled a un botón cualquiera es cómo se acaba
+        // pulsando lo que no toca.
+        const aria = (element.getAttribute('aria-label') || '').toLowerCase();
+        const esEnviar = aria.includes('send') || aria.includes('enviar') ||
+                         element.classList.contains('send-button');
+        if (esEnviar) {
+          try {
+            element.removeAttribute('disabled');
+            element.setAttribute('aria-disabled', 'false');
+            element.classList.remove('disabled');
+          } catch (e) {}
+        }
 
         try {
           element.click();
