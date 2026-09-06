@@ -108,8 +108,13 @@ function openEditor(acc) {
   actionDestSelect.value = acc.destino || 'app';
   actionGemUrlInput.value = acc.gemUrl || '';
   actionPromptInput.value = acc.prompt || '';
-  
+
   toggleGemUrlVisibility();
+
+  // También al abrir: una acción de Gem guardada antes de existir esta
+  // plantilla llega con {{transcripcion}} a secas, y el evento 'change' del
+  // desplegable no se dispara al abrirla, así que se quedaba sin arreglar.
+  applyGemDefaultPrompt();
 }
 
 function closeEditor() {
@@ -119,15 +124,30 @@ function closeEditor() {
   editForm.classList.add('hidden');
 }
 
+/**
+ * Rellena la plantilla de un destino Gem cuando el prompt actual no sirve.
+ *
+ * Enviar sólo {{transcripcion}} a un Gem no funciona: los que tienen apertura
+ * conversacional responden con su bienvenida y preguntan qué analizar, sin
+ * mirar el texto. Hace falta la instrucción mínima de que el material ya está
+ * ahí, sin decirle cómo analizarlo, que de eso ya se encarga el Gem.
+ *
+ * Sólo se rellena si el prompt está vacío o es {{transcripcion}} a secas: uno
+ * que el usuario haya escrito nunca se pisa.
+ */
+function applyGemDefaultPrompt() {
+  if (actionDestSelect.value !== 'gem') return;
+
+  const currentPrompt = actionPromptInput.value.trim();
+  if (currentPrompt !== '' && currentPrompt !== '{{transcripcion}}') return;
+
+  actionPromptInput.value = chrome.i18n.getMessage('gemDefaultPrompt') || `Analiza la transcripción del vídeo de YouTube que va debajo aplicando tu método habitual. No te presentes ni me preguntes qué analizar: el material es este texto.\n\nTítulo: {{titulo}}\nURL: {{url}}\n\nTRANSCRIPCIÓN:\n{{transcripcion}}`;
+}
+
 // Toggle Gem URL field and handle prompt template
 actionDestSelect.addEventListener('change', () => {
   toggleGemUrlVisibility();
-  if (actionDestSelect.value === 'gem') {
-    const currentPrompt = actionPromptInput.value.trim();
-    if (currentPrompt === '' || currentPrompt === '{{transcripcion}}') {
-      actionPromptInput.value = chrome.i18n.getMessage('gemDefaultPrompt') || `Analiza la transcripción del vídeo de YouTube que va debajo aplicando tu método habitual. No te presentes ni me preguntes qué analizar: el material es este texto.\n\nTítulo: {{titulo}}\nURL: {{url}}\n\nTRANSCRIPCIÓN:\n{{transcripcion}}`;
-    }
-  }
+  applyGemDefaultPrompt();
 });
 
 function toggleGemUrlVisibility() {
