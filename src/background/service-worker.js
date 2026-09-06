@@ -37,8 +37,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
         const prompt = pendingPrompts[tabId] || null;
 
-        // Eliminar la entrada consumida de esta pestaña
-        delete pendingPrompts[tabId];
+        // La entrada NO se borra aquí. Gemini puede redirigir (aceptar
+        // condiciones, elegir cuenta, /app -> /u/1/app), y cada redirección
+        // crea un documento nuevo que vuelve a ejecutar el content script. Si
+        // se consumiera en la primera lectura, la redirección se llevaría por
+        // delante el texto y la pestaña se quedaría vacía sin explicación.
+        // Se elimina en PROMPT_CONSUMED, cuando el pegado ya ha ocurrido.
 
         // Purgar entradas de más de 2 minutos y de pestañas cerradas
         const now = Date.now();
@@ -68,6 +72,31 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       } catch (err) {
         console.error('[service-worker] Error al procesar GET_PENDING_PROMPT:', err);
         sendResponse({ prompt: null });
+      }
+    })();
+    return true;
+  }
+
+  // El content script confirma que el texto ya está en el editor de Gemini.
+  // Sólo entonces se descarta, para que una redirección previa no lo pierda.
+  if (request.action === 'PROMPT_CONSUMED') {
+    (async () => {
+      try {
+        const tabId = sender?.tab?.id;
+        if (!tabId) {
+          sendResponse({ ok: false });
+          return;
+        }
+
+        const data = await chrome.storage.local.get('pendingPrompts');
+        const pendingPrompts = data.pendingPrompts || {};
+        delete pendingPrompts[tabId];
+        await chrome.storage.local.set({ pendingPrompts });
+
+        sendResponse({ ok: true });
+      } catch (err) {
+        console.error('[service-worker] Error al procesar PROMPT_CONSUMED:', err);
+        sendResponse({ ok: false });
       }
     })();
     return true;

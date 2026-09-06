@@ -37,10 +37,15 @@
 
   async function pasteAndSendPrompt() {
     try {
+      console.log('[gemini-paste] Script activo en', location.href);
+
       // Solicitar al service worker el prompt asignado a esta pestaña
       const response = await chrome.runtime.sendMessage({ action: 'GET_PENDING_PROMPT' });
       if (!response || !response.prompt || !response.prompt.text) {
-        // No hay prompt pendiente para esta pestaña; dejar sesión normal de Gemini
+        // Sin prompt para esta pestaña: es una sesión normal de Gemini y no hay
+        // nada que pegar. Se registra porque, cuando el pegado automático falla,
+        // este camino era indistinguible de que el script no llegara a correr.
+        console.log('[gemini-paste] Sin prompt pendiente para esta pestaña. No se pega nada.');
         return;
       }
 
@@ -73,6 +78,8 @@
       }
 
       if (!editor) {
+        // No se confirma el consumo: el prompt sigue guardado y, si Gemini
+        // redirige y vuelve a cargar, el siguiente intento lo recupera.
         console.warn('[gemini-paste] No se encontró el editor en Gemini. El texto permanece en el portapapeles.');
         return;
       }
@@ -115,6 +122,21 @@
 
       notifyInput();
       await sleep(250);
+
+      // El texto ya está en el editor: a partir de aquí una redirección no lo
+      // devolvería, así que se descarta para no pegarlo dos veces. El envío se
+      // intenta después, pero su resultado no cambia que el pegado ya ocurrió.
+      const textoEnEditor = (editor.textContent || editor.value || '').trim();
+      if (textoEnEditor) {
+        try {
+          await chrome.runtime.sendMessage({ action: 'PROMPT_CONSUMED' });
+        } catch (e) {
+          console.warn('[gemini-paste] No se pudo confirmar el consumo del prompt:', e);
+        }
+      } else {
+        console.warn('[gemini-paste] El editor sigue vacío tras insertar. Se conserva el prompt para un reintento.');
+        return;
+      }
 
       // Helper para verificar si un botón es el de "Detener / Stop"
       function isStopButton(btn) {
