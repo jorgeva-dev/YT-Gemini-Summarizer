@@ -266,11 +266,15 @@ async function handleSummarizeClick(action) {
     const targetUrl = action.destino === 'gem' ? action.gemUrl.trim() : 'https://gemini.google.com/app';
 
     try {
+      // La pestaña se crea SIN activar. Activarla aquí cambiaría de pestaña, y
+      // el panel se cierra solo al cambiar de pestaña: su documento moriría a
+      // mitad de esta función y el prompt de más abajo no llegaría a guardarse.
+      // Se activa al final, cuando ya está todo escrito.
       const newTab = await chrome.tabs.create({
         windowId: activeTab.windowId,
         index: activeTab.index + 1,
         url: targetUrl,
-        active: true
+        active: false
       });
 
       if (newTab && newTab.id) {
@@ -293,6 +297,15 @@ async function handleSummarizeClick(action) {
         };
 
         await chrome.storage.local.set({ pendingPrompts });
+      }
+
+      // Ya está guardado: ahora sí se puede pasar a la pestaña de Gemini.
+      if (newTab && newTab.id) {
+        try {
+          await chrome.tabs.update(newTab.id, { active: true });
+        } catch (e) {
+          console.warn('[sidepanel] No se pudo activar la pestaña de Gemini:', e);
+        }
       }
 
       // Cerrar el side panel lateral

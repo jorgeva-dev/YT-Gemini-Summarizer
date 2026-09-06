@@ -39,9 +39,22 @@
     try {
       console.log('[gemini-paste] Script activo en', location.href);
 
-      // Solicitar al service worker el prompt asignado a esta pestaña
-      const response = await chrome.runtime.sendMessage({ action: 'GET_PENDING_PROMPT' });
-      if (!response || !response.prompt || !response.prompt.text) {
+      // Solicitar al service worker el prompt asignado a esta pestaña.
+      //
+      // Se reintenta porque la pestaña empieza a cargar en cuanto se crea,
+      // mientras el side panel todavía está guardando el prompt. Preguntar una
+      // sola vez era perder la carrera en equipos donde Gemini carga rápido.
+      let prompt = null;
+      for (let intento = 0; intento < 10; intento++) {
+        const response = await chrome.runtime.sendMessage({ action: 'GET_PENDING_PROMPT' });
+        if (response && response.prompt && response.prompt.text) {
+          prompt = response.prompt;
+          break;
+        }
+        await sleep(400);
+      }
+
+      if (!prompt) {
         // Sin prompt para esta pestaña: es una sesión normal de Gemini y no hay
         // nada que pegar. Se registra porque, cuando el pegado automático falla,
         // este camino era indistinguible de que el script no llegara a correr.
@@ -49,7 +62,7 @@
         return;
       }
 
-      const { text } = response.prompt;
+      const { text } = prompt;
 
       // Opcional: ocultar la barra lateral para enfoque en el chat
       injectOptionalFocusStyles();
