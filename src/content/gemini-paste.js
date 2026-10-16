@@ -35,6 +35,90 @@
     }
   }
 
+  /**
+   * Teclea una mención de habilidad (@gem-ciencia) letra a letra y elige la
+   * opción del desplegable.
+   *
+   * Pegarla de golpe no sirve: Gemini sólo activa la habilidad cuando se
+   * selecciona en el autocompletado. Como texto plano queda inerte y el modelo
+   * responde sin ella.
+   *
+   * Los selectores del desplegable son una apuesta razonada (Gemini es Angular,
+   * así que lo normal es un overlay del CDK), no algo verificado contra su DOM.
+   * Por eso registra en consola todo lo que encuentra: si falla, esa traza dice
+   * exactamente qué hay que corregir.
+   */
+  async function insertarMencion(editor, mencion) {
+    const visible = (el) => el && (el.offsetWidth > 0 || el.offsetHeight > 0);
+
+    const SELECTORES_DESPLEGABLE = [
+      '.cdk-overlay-pane',
+      '[role="listbox"]',
+      '[role="menu"]',
+      'mat-option',
+      '[class*="mention"]',
+      '[class*="suggest"]',
+      '[class*="autocomplete"]'
+    ];
+
+    const buscarDesplegable = () => {
+      for (const sel of SELECTORES_DESPLEGABLE) {
+        const encontrados = [...document.querySelectorAll(sel)].filter(visible);
+        if (encontrados.length) return { sel, elementos: encontrados };
+      }
+      return null;
+    };
+
+    editor.focus();
+    await sleep(200);
+
+    for (const ch of mencion) {
+      document.execCommand('insertText', false, ch);
+      editor.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: ch }));
+      await sleep(90);
+    }
+
+    let desplegable = null;
+    for (let i = 0; i < 20; i++) {
+      await sleep(200);
+      desplegable = buscarDesplegable();
+      if (desplegable) break;
+    }
+
+    if (!desplegable) {
+      console.warn('[gemini-paste] No apareció ningún desplegable tras teclear', mencion);
+      return false;
+    }
+
+    console.log('[gemini-paste] Desplegable detectado con selector:', desplegable.sel, '| contenedores:', desplegable.elementos.length);
+    desplegable.elementos.slice(0, 5).forEach((el, i) => console.log(
+      `[gemini-paste]   contenedor ${i}:`, el.tagName,
+      '| role:', el.getAttribute('role'),
+      '| class:', el.className,
+      '| texto:', (el.textContent || '').trim().slice(0, 80)
+    ));
+
+    const nombre = mencion.replace(/^@/, '').toLowerCase();
+    const opciones = [];
+    for (const cont of desplegable.elementos) {
+      opciones.push(...[...cont.querySelectorAll('[role="option"],[role="menuitem"],mat-option,li,button')].filter(visible));
+      if (!cont.children.length) opciones.push(cont);
+    }
+
+    const elegida = opciones.find((el) => (el.textContent || '').toLowerCase().includes(nombre)) || opciones[0];
+
+    if (!elegida) {
+      console.warn('[gemini-paste] Desplegable visible pero sin opciones utilizables.');
+      return false;
+    }
+
+    console.log('[gemini-paste] Seleccionando:', (elegida.textContent || '').trim().slice(0, 80));
+    elegida.click();
+    await sleep(600);
+
+    return true;
+  }
+
   async function pasteAndSendPrompt() {
     try {
       console.log('[gemini-paste] Script activo en', location.href);
@@ -101,33 +185,49 @@
       editor.focus();
       await sleep(150);
 
+      // Si el prompt empieza por una mención de habilidad, hay que teclearla
+      // aparte: el resto del texto sí puede ir de golpe, pero ella no.
+      let cuerpo = text;
+      let mencionInsertada = false;
+      const mencionMatch = text.match(/^\s*(@[A-Za-z0-9_.-]+)[ \t]*\r?\n?/);
+
+      if (mencionMatch) {
+        const mencion = mencionMatch[1];
+        console.log('[gemini-paste] Mención de habilidad detectada:', mencion);
+        mencionInsertada = await insertarMencion(editor, mencion);
+        console.log('[gemini-paste] ¿Habilidad activada?', mencionInsertada);
+        cuerpo = text.slice(mencionMatch[0].length);
+      }
+
       // Inserción vía execCommand para disparar bindings de Angular / Quill / ProseMirror
       let inserted = false;
       try {
-        inserted = document.execCommand('insertText', false, text);
+        inserted = document.execCommand('insertText', false, cuerpo);
       } catch (e) {
         inserted = false;
       }
 
-      // Respaldo por si execCommand falla o no modifica el texto
-      if (!inserted || !(editor.textContent || editor.value || '').trim()) {
+      // Respaldo por si execCommand falla o no modifica el texto. No se aplica
+      // cuando hay una mención puesta: asignar textContent borraría su chip y
+      // la habilidad se desactivaría sin avisar.
+      if (!mencionInsertada && (!inserted || !(editor.textContent || editor.value || '').trim())) {
         editor.focus();
         if (editor.tagName === 'TEXTAREA' || editor.tagName === 'INPUT') {
-          editor.value = text;
+          editor.value = cuerpo;
         } else {
-          editor.textContent = text;
+          editor.textContent = cuerpo;
         }
       }
 
       // Notificar al framework (Angular/Lit/ProseMirror) para habilitar el botón de envío
       const notifyInput = () => {
         try {
-          editor.dispatchEvent(new InputEvent('input', { bubbles: true, cancelable: true, inputType: 'insertText', data: text }));
+          editor.dispatchEvent(new InputEvent('input', { bubbles: true, cancelable: true, inputType: 'insertText', data: cuerpo }));
           editor.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
           editor.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
           const pChild = editor.querySelector('p');
           if (pChild) {
-            pChild.dispatchEvent(new InputEvent('input', { bubbles: true, cancelable: true, inputType: 'insertText', data: text }));
+            pChild.dispatchEvent(new InputEvent('input', { bubbles: true, cancelable: true, inputType: 'insertText', data: cuerpo }));
             pChild.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
           }
         } catch (e) { /* ignore */ }
