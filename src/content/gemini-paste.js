@@ -197,6 +197,24 @@
         mencionInsertada = await insertarMencion(editor, mencion);
         console.log('[gemini-paste] ¿Habilidad activada?', mencionInsertada);
         cuerpo = text.slice(mencionMatch[0].length);
+
+        // Al insertar el chip de la habilidad, Gemini vuelve a montar el
+        // editor. Si seguimos apuntando al nodo anterior queda desconectado:
+        // los eventos no llegan a Angular y, peor, la comprobación de "texto
+        // en el editor" lo ve vacío y aborta el envío antes de intentarlo.
+        for (const sel of editorSelectors) {
+          const el = document.querySelector(sel);
+          if (el && (el.offsetWidth > 0 || el.offsetHeight > 0)) {
+            if (el !== editor) {
+              console.log('[gemini-paste] El editor se recreó tras la mención; se vuelve a localizar.');
+              editor = el;
+            }
+            break;
+          }
+        }
+
+        editor.focus();
+        await sleep(150);
       }
 
       // Inserción vía execCommand para disparar bindings de Angular / Quill / ProseMirror
